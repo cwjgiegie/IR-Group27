@@ -1,0 +1,147 @@
+#VRML_SIM R2025a utf8
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/Floor.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/gctronic/e-puck/protos/E-puck.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/appearances/protos/Parquetry.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/apartment_structure/protos/Wall.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/traffic/protos/WorkBarrier.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/solids/protos/SolidBox.proto"
+
+WorldInfo {
+}
+Viewpoint {
+  orientation 0.5947103576784664 -0.5222935636694293 -0.6111702085503172 4.131950210771581
+  position -1.798026360098732 -1.6479464967792974 8.676992625700889
+}
+Wall {
+  translation -0.494828 1.10576 0
+  rotation 0 0 1 -2.8797953071795863
+  name "wall(1)"
+}
+Wall {
+  translation 1.1844 -0.494164 0
+  rotation 0 0 1 -2.3561953071795863
+  name "wall(6)"
+}
+Wall {
+  translation -0.151627 0.292814 0
+  rotation 0 0 1 -1.5707953071795862
+  name "wall(7)"
+}
+Wall {
+  translation -0.0928288 5.01505 -3.58824e-13
+  rotation 0 0 -1 1.5708
+  name "north_wall"
+  size 0.2 10 2.4
+}
+Wall {
+  translation -4.97471 0.131308 -4.15668e-13
+  rotation 0 0 1 3.14159
+  name "west_wall"
+  size 0.2 10 2.4
+}
+Wall {
+  translation 4.94098 0.00216715 -4.15668e-13
+  rotation 0 0 1 3.14159
+  name "east_wall"
+  size 0.2 10 2.4
+}
+Wall {
+  translation -0.0340034 -4.95052 -4.01457e-13
+  rotation 0 0 -1 1.5708
+  name "south_wall"
+  size 0.2 10 2.4
+}
+Wall {
+  translation -0.509825 1.16688 0
+  rotation 0 0 1 -2.094395307179586
+  name "wall(3)"
+}
+Wall {
+  translation -2.7444 -2.33934 -5.32907e-15
+  rotation 0 0 1 -1.5707953071795862
+  name "wall(2)"
+}
+DEF GOAL Solid {
+  translation 1 1 2.71
+  children [
+    Shape {
+      appearance Appearance {
+        material Material {
+          diffuseColor 0.8 0.0901961 0.0235294
+        }
+        texture ImageTexture {
+        }
+      }
+      geometry Cone {
+        bottomRadius 0.1
+        height 5
+      }
+    }
+  ]
+  name "Goal"
+}
+DEF CHARGING_STATION SolidBox {
+  translation 3 -3 0.3
+  name "ChargingStation"
+  size 0.2 0.2 0.2
+}
+Floor {
+  appearance Parquetry {
+    type "light strip"
+  }
+}
+Wall {
+  translation 0.266012 -1.25274 -0.207658
+  rotation -0.05130869784229023 0.059547697495811555 0.9969059580766261 -2.847685307179586
+}
+Wall {
+  translation 0.909048 1.38008 -0.207658
+  rotation 0.006318332107435832 -0.11128603711868548 -0.9937683314645314 1.54404
+  name "wall(5)"
+}
+Wall {
+  translation 1.93989 -2.64774 -0.207658
+  rotation -0.05130869784229023 0.059547697495811555 0.9969059580766261 -2.847685307179586
+  name "wall(4)"
+}
+Wall {
+  translation -0.12443 -0.777642 -0.138519
+  rotation 0.35530611217228913 0.3061460966521748 -0.883194278829777 -0.33311530717958604
+  name "wall(8)"
+}
+TexturedBackgroundLight {
+}
+TexturedBackground {
+}
+DEF e-puck E-puck {
+  hidden position_0_0 -9.033864347630749e-10
+  hidden position_0_1 -9.033871567594338e-10
+  hidden linearVelocity_0 -1.2522625085490945e-05 -1.2449565667405199e-05 -9.163619315207472e-09
+  hidden angularVelocity_0 0.0008299708965458097 -0.0008348415243388162 6.233752548543093e-12
+  translation -3.0000100001419567 -3.00001000014113 -6.396086810829538e-05
+  rotation -1.4501551530909997e-05 3.5163608188370903e-05 0.9999999992766129 0.782472540507268
+  controller "intelligent_robot_controller"
+  supervisor TRUE
+}
+WorkBarrier {
+  translation -1.70221 -1.06953 0.02
+  rotation 0 0 -1 1.309
+}
+WorkBarrier {
+  translation -0.861625 -2.03397 -0.08
+  rotation 0 0 1 -2.3561953071795863
+  name "work barrier(2)"
+}
+WorkBarrier {
+  translation -3.21813 0.234459 -0.16
+  rotation 0 0 1 -1.047195307179586
+  name "work barrier(1)"
+}
+TexturedBackgroundLight {
+}
+DirectionalLight {
+  direction 0 -1 0
+}
