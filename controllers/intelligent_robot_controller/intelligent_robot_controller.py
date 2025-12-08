@@ -1,5 +1,5 @@
 # intelligent_robot_controller.py
-# 版本：模糊行为选择 + 抖动抑制 + A* + 改进避障 & 低电优先充电
+# 版本：模糊行为选择 + 抖动抑制 + 分离的 A* + 改进避障 & 低电优先充电
 
 from controller import Supervisor
 import math
@@ -7,6 +7,18 @@ import heapq
 
 TIME_STEP = 64
 
+# ===== 动态障碍物参数 =====
+WALL_DEF_NAME = "MOVING_WALL"
+WALL_AMPLITUDE = 1.2      # 左右摆动幅度 (米)
+WALL_SPEED = 0.4          # 摆动速度 (rad/s)
+WALL2_DEF_NAME = "MOVING_WALL2"
+WALL2_AMPLITUDE = 0.2     # 第二堵墙的摆动幅度
+WALL2_SPEED = 0.6         # 第二堵墙的摆动速度
+WALL3_DEF_NAME = "MOVING_WALL3"
+WALL3_AMPLITUDE = 0.3     # 第三堵墙的摆动幅度
+WALL3_SPEED = 0.7         # 第三堵墙的摆动速度
+
+# ===== 地图参数 =====
 START_X = -3.0
 START_Y = -3.0
 
@@ -27,6 +39,166 @@ GRID_WIDTH = int(round((MAP_MAX_X - MAP_MIN_X) / GRID_RES)) + 1
 GRID_HEIGHT = int(round((MAP_MAX_Y - MAP_MIN_Y) / GRID_RES)) + 1
 
 
+# ========= 全局栅格坐标转换函数（A* 和占据栅格复用） =========
+def world_to_grid(x: float, y: float):
+    gx = int(round((x - MAP_MIN_X) / GRID_RES))
+    gy = int(round((y - MAP_MIN_Y) / GRID_RES))
+    gx = max(0, min(GRID_WIDTH - 1, gx))
+    gy = max(0, min(GRID_HEIGHT - 1, gy))
+    return gx, gy
+
+
+def grid_to_world(gx: int, gy: int):
+    x = MAP_MIN_X + gx * GRID_RES
+    y = MAP_MIN_Y + gy * GRID_RES
+    return x, y
+
+
+# ========= A* 路径规划器（已分离） =========
+class GridAStarPlanner:
+    """
+    简单的栅格 A*：
+    - 使用全局 MAP_MIN/MAX 和 GRID_RES；
+    - 起点 / 终点落在障碍格子时，会在附近搜索最近的空格子；
+    - 8 邻域（含对角线），对角线代价为 sqrt(2)。
+    """
+
+    def __init__(self, occupancy):
+        """
+        occupancy: 2D list[gy][gx]，0=空，1=障碍
+        """
+        self.occupancy = occupancy
+        self.height = len(occupancy)
+        self.width = len(occupancy[0]) if self.height > 0 else 0
+
+    def _in_bounds(self, gx, gy):
+        return 0 <= gx < self.width and 0 <= gy < self.height
+
+    def _is_free(self, gx, gy):
+        return self._in_bounds(gx, gy) and self.occupancy[gy][gx] == 0
+
+    def _find_nearest_free(self, gx, gy, max_radius=6):
+        """
+        如果 (gx, gy) 是障碍，就在 max_radius 范围内找最近的空格。
+        找不到就返回 None。
+        """
+        if self._is_free(gx, gy):
+            return gx, gy
+
+        best = None
+        best_dist2 = None
+
+        for r in range(1, max_radius + 1):
+            for dx in range(-r, r + 1):
+                for dy in range(-r, r + 1):
+                    nx = gx + dx
+                    ny = gy + dy
+                    if not self._is_free(nx, ny):
+                        continue
+                    d2 = dx * dx + dy * dy
+                    if best is None or d2 < best_dist2:
+                        best = (nx, ny)
+                        best_dist2 = d2
+            if best is not None:
+                break
+
+        return best
+
+    def plan(self, start_xy, goal_xy):
+        sx, sy = start_xy
+        gx, gy = goal_xy
+
+        start_gx, start_gy = world_to_grid(sx, sy)
+        goal_gx, goal_gy = world_to_grid(gx, gy)
+
+        # 起点 / 终点若落在障碍上，试图挪到最近空格
+        s_free = self._find_nearest_free(start_gx, start_gy, max_radius=3)
+        g_free = self._find_nearest_free(goal_gx, goal_gy, max_radius=6)
+
+        if s_free is None:
+            print(">>> [A*] Start region fully blocked, no path.")
+            return []
+
+        if g_free is None:
+            print(">>> [A*] Goal region fully blocked, no path.")
+            return []
+
+        start_gx, start_gy = s_free
+        goal_gx, goal_gy = g_free
+
+        if (start_gx, start_gy) != world_to_grid(sx, sy):
+            sx2, sy2 = grid_to_world(start_gx, start_gy)
+            print(f">>> [A*] Adjusted start to nearest free cell: ({sx2:.2f}, {sy2:.2f})")
+
+        if (goal_gx, goal_gy) != world_to_grid(gx, gy):
+            gx2, gy2 = grid_to_world(goal_gx, goal_gy)
+            print(f">>> [A*] Adjusted goal to nearest free cell: ({gx2:.2f}, {gy2:.2f})")
+
+        # A* 主体
+        open_set = []
+        heapq.heappush(open_set, (0.0, (start_gx, start_gy)))
+        came_from = {}
+        g_score = {(start_gx, start_gy): 0.0}
+
+        def heuristic(ax, ay, bx, by):
+            # 用欧氏距离的轻微放大，减少 tie
+            return math.hypot(ax - bx, ay - by) * 1.001
+
+        closed = set()
+        max_iter = self.width * self.height * 4
+
+        # 8 邻域（dx, dy, cost）
+        neighbors = [
+            (1, 0, 1.0),
+            (-1, 0, 1.0),
+            (0, 1, 1.0),
+            (0, -1, 1.0),
+            (1, 1, math.sqrt(2.0)),
+            (1, -1, math.sqrt(2.0)),
+            (-1, 1, math.sqrt(2.0)),
+            (-1, -1, math.sqrt(2.0)),
+        ]
+
+        while open_set and max_iter > 0:
+            max_iter -= 1
+            _, (cx, cy) = heapq.heappop(open_set)
+            if (cx, cy) in closed:
+                continue
+            closed.add((cx, cy))
+
+            if cx == goal_gx and cy == goal_gy:
+                # 回溯路径
+                path_cells = []
+                cur = (cx, cy)
+                while cur in came_from:
+                    path_cells.append(cur)
+                    cur = came_from[cur]
+                path_cells.append((start_gx, start_gy))
+                path_cells.reverse()
+                # 转回世界坐标
+                waypoints = [grid_to_world(px, py) for (px, py) in path_cells]
+                return waypoints
+
+            for dx, dy, step_cost in neighbors:
+                nx = cx + dx
+                ny = cy + dy
+                if not self._in_bounds(nx, ny):
+                    continue
+                if self.occupancy[ny][nx] == 1:
+                    continue
+
+                tentative_g = g_score[(cx, cy)] + step_cost
+                if (nx, ny) not in g_score or tentative_g < g_score[(nx, ny)]:
+                    g_score[(nx, ny)] = tentative_g
+                    f = tentative_g + heuristic(nx, ny, goal_gx, goal_gy)
+                    heapq.heappush(open_set, (f, (nx, ny)))
+                    came_from[(nx, ny)] = (cx, cy)
+
+        print(">>> [A*] Failed to find path.")
+        return []
+
+
+# ========= 机器人状态 =========
 class RobotState:
     def __init__(self):
         self.x = START_X
@@ -50,7 +222,6 @@ class RobotState:
         self.path_index = 0
         self.current_high_level_target = "GOAL"
 
-        # 卡死检测（可扩展用）
         self.last_target_dist = None
         self.no_progress_ticks = 0
 
@@ -71,6 +242,7 @@ class IntelligentRobotController(Supervisor):
         self.left_motor.setVelocity(0.0)
         self.right_motor.setVelocity(0.0)
 
+        # 传感器
         sensor_names = ["ps0", "ps1", "ps2", "ps3", "ps4", "ps5", "ps6", "ps7"]
         self.distance_sensors = []
         for name in sensor_names:
@@ -85,194 +257,180 @@ class IntelligentRobotController(Supervisor):
         self.behavior_cooldown = 20
         self.hysteresis_margin = 0.1
 
+        # ===== 静态地图 + A* 路径规划器 =====
         self.occupancy = self.build_static_occupancy()
+        self.planner = GridAStarPlanner(self.occupancy)
         self.plan_path_to_high_level_target("GOAL")
 
-    # ===== 栅格转换 =====
-    def world_to_grid(self, x: float, y: float):
-        gx = int(round((x - MAP_MIN_X) / GRID_RES))
-        gy = int(round((y - MAP_MIN_Y) / GRID_RES))
-        gx = max(0, min(GRID_WIDTH - 1, gx))
-        gy = max(0, min(GRID_HEIGHT - 1, gy))
-        return gx, gy
+        # ===== 动态障碍物 MOVING_WALL =====
+        self.wall_node = self.getFromDef(WALL_DEF_NAME)
+        if self.wall_node:
+            self.wall_translation_field = self.wall_node.getField("translation")
+            self.wall_start_pos = self.wall_translation_field.getSFVec3f()
+            print(f"[INFO] MOVING_WALL start pos: {self.wall_start_pos}")
+        else:
+            print("[WARN] MOVING_WALL not found.")
+            self.wall_translation_field = None
+            self.wall_start_pos = None
 
-    def grid_to_world(self, gx: int, gy: int):
-        x = MAP_MIN_X + gx * GRID_RES
-        y = MAP_MIN_Y + gy * GRID_RES
-        return x, y
+        # MOVING_WALL2
+        self.wall2_node = self.getFromDef(WALL2_DEF_NAME)
+        if self.wall2_node is not None:
+            self.wall2_translation_field = self.wall2_node.getField("translation")
+            self.wall2_start_pos = self.wall2_translation_field.getSFVec3f()
+            print(f"[INFO] MOVING_WALL2 start pos: {self.wall2_start_pos}")
+        else:
+            print("[WARN] MOVING_WALL2 not found.")
+            self.wall2_translation_field = None
+            self.wall2_start_pos = None
 
+        # MOVING_WALL3
+        self.wall3_node = self.getFromDef(WALL3_DEF_NAME)
+        if self.wall3_node is not None:
+            self.wall3_translation_field = self.wall3_node.getField("translation")
+            self.wall3_start_pos = self.wall3_translation_field.getSFVec3f()
+            print(f"[INFO] MOVING_WALL3 start pos: {self.wall3_start_pos}")
+        else:
+            print("[WARN] MOVING_WALL3 not found.")
+            self.wall3_translation_field = None
+            self.wall3_start_pos = None
+
+        self.sim_time = 0.0  # 用于动态墙运动
+
+    # ========== 动态障碍物移动 ==========
+    def update_dynamic_wall(self):
+        self.sim_time += TIME_STEP / 1000.0
+        t = self.sim_time
+
+        # MOVING_WALL：沿 X 轴
+        if self.wall_translation_field is not None and self.wall_start_pos is not None:
+            x0, y0, z0 = self.wall_start_pos
+            offset = WALL_AMPLITUDE * math.sin(WALL_SPEED * t)
+            new_x = x0 + offset
+            self.wall_translation_field.setSFVec3f([new_x, y0, z0])
+
+        # MOVING_WALL2：沿 Z 轴
+        if self.wall2_translation_field is not None and self.wall2_start_pos is not None:
+            x0, y0, z0 = self.wall2_start_pos
+            offset2 = WALL2_AMPLITUDE * math.sin(WALL2_SPEED * t + math.pi / 2.0)
+            new_z2 = z0 + offset2
+            self.wall2_translation_field.setSFVec3f([x0, y0, new_z2])
+
+        # MOVING_WALL3：沿 X 轴，带相位差
+        if self.wall3_translation_field is not None and self.wall3_start_pos is not None:
+            x0, y0, z0 = self.wall3_start_pos
+            offset3 = WALL3_AMPLITUDE * math.sin(WALL3_SPEED * t + math.pi)
+            new_x3 = x0 + offset3
+            self.wall3_translation_field.setSFVec3f([new_x3, y0, z0])
+
+    # ===== 占据栅格构建 =====
     def build_static_occupancy(self):
         occ = [[0 for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
-    
-        # 统一的安全余量（可以根据效果调大/调小）
-        # margin = 0.05  # 上面是计算用的，这里直接写死数值了
-    
-        # 每一条注释对应你发的一行：  x y z // size // rotation
-    
-        # 1) -0.494828 1.10576 0 // 0.2 1 2.4 // 0 0 1 -2.879...
-        #   → 大概在上方的一块竖着的墙
+
+        # 下面每一个 mark_obstacle_rect 对应一个静态障碍物
+        # 这些数值是你之前发给我的障碍坐标 & 大致范围
+
+        # 1) -0.494828 1.10576 0
         self.mark_obstacle_rect(
             occ,
-            -0.644828, -0.344828,   # xmin, xmax
-            0.55576, 1.65576        # ymin, ymax
+            -0.644828, -0.344828,
+            0.55576, 1.65576
         )
-    
-        # 2) 0.972293 -0.282034 0 // 0.2 1 2.4 // 0 0 1 -2.356...
+
+        # 2) 0.972293 -0.282034 0
         self.mark_obstacle_rect(
             occ,
             0.822293, 1.122293,
             -0.832034, 0.267966
         )
-    
-        # 3) -0.111627 0.292814 0 // 0.2 1 2.4 // 0 0 1 -1.5707...
+
+        # 3) -0.111627 0.292814 0
         self.mark_obstacle_rect(
             occ,
             -0.261627, 0.038373,
             -0.257186, 0.842814
         )
-    
-        # 4) -0.509825 1.16688 0 // 0.2 1 2.4 // 0 0 1 -2.0943...
+
+        # 4) -0.509825 1.16688 0
         self.mark_obstacle_rect(
             occ,
             -0.659825, -0.359825,
             0.61688, 1.71688
         )
-    
-        # 5) -2.7444 -2.33934 -5.3e-15 // 0.2 1 2.4 // 0 0 -1 1.309
+
+        # 5) -2.7444 -2.33934
         self.mark_obstacle_rect(
             occ,
             -2.8944, -2.5944,
             -2.88934, -1.78934
         )
-    
-        # 6) 0.909048 1.38008 -0.207658 // 0.2 1 2.4 // ... 1.54404
+
+        # 6) 0.909048 1.38008
         self.mark_obstacle_rect(
             occ,
             0.759048, 1.059048,
             0.83008, 1.93008
         )
-    
-        # 7) 0.266012 -1.25274 -0.207658 // 0.2 1 2.4 // ... -2.84768
+
+        # 7) 0.266012 -1.25274
         self.mark_obstacle_rect(
             occ,
             0.116012, 0.416012,
             -1.80274, -0.70274
         )
-    
-        # 8) 1.93989 -2.64774 -0.207658 // 0.2 1 2.4 // ... -2.84768
+
+        # 8) 1.93989 -2.64774
         self.mark_obstacle_rect(
             occ,
             1.78989, 2.08989,
             -3.19774, -2.09774
         )
-    
-        # 9) -1.78915 -1.09284 0.02 // 0.2 1 2.4 // 0 0 -1 1.309
+
+        # 9) -1.78915 -1.09284
         self.mark_obstacle_rect(
             occ,
             -1.93915, -1.63915,
             -1.64284, -0.54284
         )
-    
-        # 10) -0.861625 -2.03397 -0.08 // 0.2 1 2.4 // 0 0 1 -2.356...
+
+        # 10) -0.861625 -2.03397
         self.mark_obstacle_rect(
             occ,
             -1.011625, -0.711625,
             -2.58397, -1.48397
         )
-    
-        # 11) -3.21813 0.234459 -0.16 // 0.2 1 2.4 // 0 0 1 -1.0471...
+
+        # 11) -3.21813 0.234459
         self.mark_obstacle_rect(
             occ,
             -3.36813, -3.06813,
             -0.315541, 0.784459
         )
-        # --- New obstacle A ---
-        # -0.124335 -0.855721 -0.1305 // 0.2 1 2.4 // rotation...
+
+        # New obstacle A
         self.mark_obstacle_rect(
             occ,
-            -0.274335, 0.025665,     # xmin, xmax
-            -1.405721, -0.305721     # ymin, ymax
+            -0.274335, 0.025665,
+            -1.405721, -0.305721
         )
-    
-        # --- New obstacle B ---
-        # -1.87502 -2.30412 -0.1305 // 0.2 1 2.4 // rotation...
+
+        # New obstacle B
         self.mark_obstacle_rect(
             occ,
-            -2.02502, -1.72502,      # xmin, xmax
-            -2.85412, -1.75412       # ymin, ymax
+            -2.02502, -1.72502,
+            -2.85412, -1.75412
         )
-        
-    
+
         return occ
 
     def mark_obstacle_rect(self, occ, xmin, xmax, ymin, ymax):
-        gx_min, gy_min = self.world_to_grid(xmin, ymin)
-        gx_max, gy_max = self.world_to_grid(xmax, ymax)
+        gx_min, gy_min = world_to_grid(xmin, ymin)
+        gx_max, gy_max = world_to_grid(xmax, ymax)
         for gy in range(min(gy_min, gy_max), max(gy_min, gy_max) + 1):
             for gx in range(min(gx_min, gx_max), max(gx_min, gx_max) + 1):
                 occ[gy][gx] = 1
 
-    # ===== A* =====
-    def astar(self, start_xy, goal_xy):
-        sx, sy = start_xy
-        gx, gy = goal_xy
-
-        start_gx, start_gy = self.world_to_grid(sx, sy)
-        goal_gx, goal_gy = self.world_to_grid(gx, gy)
-
-        if self.occupancy[goal_gy][goal_gx] == 1:
-            print(">>> [A*] Goal grid occupied, path may fail.")
-
-        open_set = []
-        heapq.heappush(open_set, (0.0, (start_gx, start_gy)))
-        came_from = {}
-        g_score = {(start_gx, start_gy): 0.0}
-
-        def heuristic(ax, ay, bx, by):
-            return abs(ax - bx) + abs(ay - by)
-
-        closed = set()
-        max_iter = GRID_WIDTH * GRID_HEIGHT * 4
-
-        while open_set and max_iter > 0:
-            max_iter -= 1
-            _, (cx, cy) = heapq.heappop(open_set)
-            if (cx, cy) in closed:
-                continue
-            closed.add((cx, cy))
-
-            if cx == goal_gx and cy == goal_gy:
-                path = []
-                cur = (cx, cy)
-                while cur in came_from:
-                    path.append(cur)
-                    cur = came_from[cur]
-                path.append((start_gx, start_gy))
-                path.reverse()
-                wp = [self.grid_to_world(px, py) for (px, py) in path]
-                return wp
-
-            for dx in [-1, 0, 1]:
-                for dy in [-1, 0, 1]:
-                    if dx == 0 and dy == 0:
-                        continue
-                    nx = cx + dx
-                    ny = cy + dy
-                    if not (0 <= nx < GRID_WIDTH and 0 <= ny < GRID_HEIGHT):
-                        continue
-                    if self.occupancy[ny][nx] == 1:
-                        continue
-
-                    tentative_g = g_score[(cx, cy)] + math.hypot(dx, dy)
-                    if (nx, ny) not in g_score or tentative_g < g_score[(nx, ny)]:
-                        g_score[(nx, ny)] = tentative_g
-                        f = tentative_g + heuristic(nx, ny, goal_gx, goal_gy)
-                        heapq.heappush(open_set, (f, (nx, ny)))
-                        came_from[(nx, ny)] = (cx, cy)
-
-        print(">>> [A*] Failed to find path.")
-        return []
-
+    # ===== 使用分离的 A* 进行路径规划 =====
     def plan_path_to_high_level_target(self, target_type: str):
         if target_type == "CHARGE":
             target_xy = CHARGING_STATION
@@ -280,7 +438,7 @@ class IntelligentRobotController(Supervisor):
             target_xy = GOAL_POSITION
 
         start_xy = (self.state.x, self.state.y)
-        path = self.astar(start_xy, target_xy)
+        path = self.planner.plan(start_xy, target_xy)
 
         if not path:
             print(f">>> [A*] No path found to {target_type}, use direct point.")
@@ -341,7 +499,7 @@ class IntelligentRobotController(Supervisor):
             if self.state.path_index < len(self.state.path) - 1:
                 self.state.path_index += 1
 
-        # 记录到高层目标的距离，用于卡死检测（可扩展用）
+        # 记录到高层目标的距离，用于卡死检测（暂时保留）
         if self.state.current_high_level_target == "CHARGE":
             tx2, ty2 = CHARGING_STATION
         else:
@@ -428,7 +586,7 @@ class IntelligentRobotController(Supervisor):
             return 1.0
         return (dist - 0.1) / 0.9
 
-    # ===== 行为选择（改：低电优先 CHARGE） =====
+    # ===== 行为选择（低电优先 CHARGE） =====
     def select_behavior(self):
         batt = self.state.battery_level
         danger = self.state.obstacle_danger
@@ -483,7 +641,7 @@ class IntelligentRobotController(Supervisor):
 
         return activations
 
-    # ===== 控制命令（改：高危险双侧障碍时直线后退） =====
+    # ===== 底层控制命令 =====
     def compute_command(self):
         if self.state.mission_done or self.state.battery_level <= 0.0:
             return 0.0, 0.0
@@ -513,7 +671,7 @@ class IntelligentRobotController(Supervisor):
             if behavior == "AVOID":
                 if danger > 0.6:
                     turn_bias = 3.0 if left_o > right_o else -3.0
-                    v = -2.0   # 稍微小一点，避免过分 spin
+                    v = -2.0
                     w = turn_bias
                 else:
                     v = 1.5
@@ -544,6 +702,9 @@ class IntelligentRobotController(Supervisor):
         while self.step(TIME_STEP) != -1:
             self.tick += 1
 
+            # 更新动态障碍物
+            self.update_dynamic_wall()
+
             if self.state.battery_level <= 0.0:
                 print(">>> [BAT] Battery empty, stop.")
                 self.left_motor.setVelocity(0.0)
@@ -570,20 +731,15 @@ class IntelligentRobotController(Supervisor):
 
             if self.tick - last_log_tick >= 20:
                 last_log_tick = self.tick
-                print(
-                    f"[t={self.tick}] pos=({self.state.x:.2f},{self.state.y:.2f}) "
-                    f"theta={self.state.theta:.2f} "
-                    f"HL_target={self.state.current_high_level_target} "
-                    f"dist={self.state.distance_to_goal:.2f} "
-                    f"batt={self.state.battery_level:.1f} "
-                    f"danger={self.state.obstacle_danger:.2f} "
-                    f"Lobs={self.state.left_obstacle:.2f} "
-                    f"Robs={self.state.right_obstacle:.2f} "
-                    f"behavior={self.state.active_behavior} "
-                    f"acts={acts} "
-                    f"wp_idx={self.state.path_index}/{len(self.state.path)} "
-                    f"cmd=({v_left:.2f},{v_right:.2f})"
-                )
+                print(f"[t={self.tick}] pos=({self.state.x:.2f},{self.state.y:.2f}) "
+                      f"theta={self.state.theta:.2f} "
+                      f"HL_target={self.state.current_high_level_target} "
+                      f"dist={self.state.distance_to_goal:.2f} "
+                      f"batt={self.state.battery_level:.1f} "
+                      f"danger={self.state.obstacle_danger:.2f} "
+                      f"Lobs={self.state.left_obstacle:.2f} "
+                      f"Robs={self.state.right_obstacle:.2f} "
+                      f"behavior={self.state.active_behavior}")
 
 
 if __name__ == "__main__":
