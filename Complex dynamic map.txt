@@ -1,0 +1,25 @@
+ # Dynamic Obstacle Movement
+    def update_dynamic_wall(self):
+        self.sim_time += TIME_STEP / 1000.0  # 仿真时间（秒）
+        t = self.sim_time
+
+# First Wall: Move Left and Right Along the X-Axis
+        if self.wall_translation_field is not None and self.wall_start_pos is not None:
+            x0, y0, z0 = self.wall_start_pos
+            offset = WALL_AMPLITUDE * math.sin(WALL_SPEED * t)
+            new_x = x0 + offset
+            self.wall_translation_field.setSFVec3f([new_x, y0, z0])
+
+# The Second Wall: Move Back and Forth Along the Z-Axis
+        if self.wall2_translation_field is not None and self.wall2_start_pos is not None:
+            x0, y0, z0 = self.wall2_start_pos
+            offset2 = WALL2_AMPLITUDE * math.sin(WALL2_SPEED * t + math.pi / 2.0)
+            new_z2 = z0 + offset2
+            self.wall2_translation_field.setSFVec3f([x0, y0, new_z2])
+
+# The Third Wall: Move Left and Right Along the X-Axis + Phase Difference
+        if self.wall3_translation_field is not None and self.wall3_start_pos is not None:
+            x0, y0, z0 = self.wall3_start_pos
+            offset3 = WALL3_AMPLITUDE * math.sin(WALL3_SPEED * t + math.pi)
+            new_x3 = x0 + offset3
+            self.wall3_translation_field.setSFVec3f([new_x3, y0, z0])
