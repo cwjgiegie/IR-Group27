@@ -466,55 +466,84 @@ class IntelligentRobotController(Supervisor):
         return self.state.path[self.state.path_index]
 
     # ===== 姿态更新 =====
+
     def update_pose(self):
+       
+        self._read_pose_from_simulation()
+        self._update_goal_distance_and_heading()
+        self._check_final_goal_reached()
+        self._update_waypoint_progress()
+        self._update_no_progress_monitor()
+
+        return self.state.current_high_level_target
+
+    def _read_pose_from_simulation(self):
+       
         trans = self.robot_node.getField("translation").getSFVec3f()
         rot = self.robot_node.getField("rotation").getSFRotation()
 
         self.state.x = trans[0]
         self.state.y = trans[1]
+       
+        self.state.theta = rot[3]
 
-        axis_x, axis_y, axis_z, angle = rot
-        self.state.theta = angle
-
+    def _update_goal_distance_and_heading(self):
+        
         tx, ty = self.get_current_path_target_point()
         dx = tx - self.state.x
         dy = ty - self.state.y
+
         dist = math.hypot(dx, dy)
         self.state.distance_to_goal = dist
 
         target_theta = math.atan2(dy, dx)
         heading_err = target_theta - self.state.theta
+        
         heading_err = (heading_err + math.pi) % (2.0 * math.pi) - math.pi
         self.state.heading_error = heading_err
 
+    def _check_final_goal_reached(self):
+        
         gx, gy = GOAL_POSITION
         dist_final_goal = math.hypot(self.state.x - gx, self.state.y - gy)
-        if self.state.current_high_level_target != "CHARGE" and dist_final_goal < GOAL_REACHED_DIST:
+
+        if (
+            self.state.current_high_level_target != "CHARGE"
+            and dist_final_goal < GOAL_REACHED_DIST
+        ):
             if not self.state.mission_done:
                 print(">>> [TASK] Final goal reached, mission done.")
             self.state.mission_done = True
 
-        # 路径点更新
-        if dist < WAYPOINT_REACHED_DIST and self.state.path:
+    def _update_waypoint_progress(self):
+        
+        if not self.state.path:
+            return
+
+        if self.state.distance_to_goal < WAYPOINT_REACHED_DIST:
             if self.state.path_index < len(self.state.path) - 1:
                 self.state.path_index += 1
 
-        # 记录到高层目标的距离，用于卡死检测（暂时保留）
+    def _update_no_progress_monitor(self):
+        
         if self.state.current_high_level_target == "CHARGE":
             tx2, ty2 = CHARGING_STATION
         else:
             tx2, ty2 = GOAL_POSITION
+
         dist_to_high_target = math.hypot(self.state.x - tx2, self.state.y - ty2)
+
         if self.state.last_target_dist is None:
             self.state.last_target_dist = dist_to_high_target
-        else:
-            if abs(dist_to_high_target - self.state.last_target_dist) < 0.005:
-                self.state.no_progress_ticks += 1
-            else:
-                self.state.no_progress_ticks = 0
-            self.state.last_target_dist = dist_to_high_target
+            return
 
-        return self.state.current_high_level_target
+        if abs(dist_to_high_target - self.state.last_target_dist) < 0.005:
+            self.state.no_progress_ticks += 1
+        else:
+            self.state.no_progress_ticks = 0
+
+        self.state.last_target_dist = dist_to_high_target
+
 
     # ===== 传感器 =====
     def update_sensors(self):
