@@ -551,25 +551,24 @@ class IntelligentRobotController(Supervisor):
             return
 
         values = [s.getValue() for s in self.distance_sensors]
-        max_val = max(values)
+        # 单独方法：归一化到 0–1
+        def _normalize(val, baseline=60.0, rng=80.0):
+            return max(0.0, min(1.0, (val - baseline) / rng))
 
-        baseline = 60.0
-        max_range = 80.0
-        danger_raw = (max_val - baseline) / max_range
-        danger = max(0.0, min(1.0, danger_raw))
-        self.state.obstacle_danger = danger
+        # 危险度（最大值决定）
+        self.state.obstacle_danger = _normalize(max(values))
 
-        if len(values) == 8:
-            left_sum = sum(values[0:4])
-            right_sum = sum(values[4:8])
-        else:
-            mid = len(values) // 2
-            left_sum = sum(values[:mid])
-            right_sum = sum(values[mid:])
+        # 左右分组自动处理
+        mid = len(values) // 2
+        left_sum = sum(values[:mid])
+        right_sum = sum(values[mid:])
 
-        norm = 400.0
-        self.state.left_obstacle = min(1.0, left_sum / norm)
-        self.state.right_obstacle = min(1.0, right_sum / norm)
+        # 使用统一归一化方法（保持原始行为：400 为经验值）
+        def _normalize_group(sum_val, group_norm=400.0):
+            return max(0.0, min(1.0, sum_val / group_norm))
+
+        self.state.left_obstacle = _normalize_group(left_sum)
+        self.state.right_obstacle = _normalize_group(right_sum)
 
     # ===== 电量 =====
     def update_battery(self, moving: bool):
@@ -598,23 +597,29 @@ class IntelligentRobotController(Supervisor):
                     print(">>> [BAT] Fully charged at station.")
 
     # ===== 模糊 membership =====
-    def fuzzy_low_battery(self, batt: float) -> float:
-        if batt >= 60.0:
+    def _linear_membership(self, value, start, end, invert=False):
+        """
+        通用模糊线性隶属度计算：
+        - invert=False: start→0, end→1
+        - invert=True:  start→1, end→0
+        """
+        if start == end:
             return 0.0
-        if batt <= 20.0:
-            return 1.0
-        return (60.0 - batt) / 40.0
+        t = (value - start) / (end - start)
+        t = max(0.0, min(1.0, t))
+        return 1.0 - t if invert else t
+
+    def fuzzy_low_battery(self, batt: float) -> float:
+        # 原逻辑：60→0, 20→1
+        return self._linear_membership(batt, 60.0, 20.0, invert=True)
 
     def fuzzy_obstacle_near(self, danger: float) -> float:
         return max(0.0, min(1.0, danger))
 
     def fuzzy_far_from_goal(self, dist: float) -> float:
-        if dist <= 0.1:
-            return 0.0
-        if dist >= 1.0:
-            return 1.0
-        return (dist - 0.1) / 0.9
-
+        # 原逻辑：0.1→0, 1.0→1
+        return self._linear_membership(dist, 0.1, 1.0)
+    
     # ===== 行为选择（低电优先 CHARGE） =====
     def select_behavior(self):
         batt = self.state.battery_level
