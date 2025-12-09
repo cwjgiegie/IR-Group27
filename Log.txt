@@ -1,0 +1,61 @@
+    def run_controller(self):
+        last_log_tick = -999
+
+        while self.step(TIME_STEP) != -1:
+            self.tick += 1
+
+            # 更新动态障碍物
+            self.update_dynamic_wall()
+
+            if self.state.battery_level <= 0.0:
+                print(">>> [BAT] Battery empty, stop.")
+                self.left_motor.setVelocity(0.0)
+                self.right_motor.setVelocity(0.0)
+                continue
+
+            if self.state.mission_done:
+                self.left_motor.setVelocity(0.0)
+                self.right_motor.setVelocity(0.0)
+                if not self.state.summary_printed:
+                    print(
+                        f">>> [SUMMARY] dist_travelled={self.state.distance_travelled:.3f} m, "
+                        f"behavior_switches={self.state.behavior_switch_count}, "
+                        f"collisions={self.state.collision_count}, "
+                        f"stuck_replans={self.state.stuck_replan_count}, "
+                        f"energy_used={self.state.start_battery - self.state.end_battery:.2f}"
+                    )
+                    self.state.summary_printed = True
+                continue
+
+            target_name = self.update_pose()
+            self.update_sensors()
+
+            acts = self.select_behavior()
+
+            v_left, v_right = self.compute_command()
+            moving = (abs(v_left) > 0.05 or abs(v_right) > 0.05)
+
+            self.update_battery(moving)
+
+            self.left_motor.setVelocity(v_left)
+            self.right_motor.setVelocity(v_right)
+
+            if self.tick - last_log_tick >= 20:
+                last_log_tick = self.tick
+                print(
+                    f"[t={self.tick}] pos=({self.state.x:.2f},{self.state.y:.2f}) "
+                    f"theta={self.state.theta:.2f} "
+                    f"HL_target={self.state.current_high_level_target} "
+                    f"dist={self.state.distance_to_goal:.2f} "
+                    f"batt={self.state.battery_level:.1f} "
+                    f"danger={self.state.obstacle_danger:.2f} "
+                    f"Lobs={self.state.left_obstacle:.2f} "
+                    f"Robs={self.state.right_obstacle:.2f} "
+                    f"behavior={self.state.active_behavior}"
+                )
+                self.log_status()
+
+
+if __name__ == "__main__":
+    controller = IntelligentRobotController()
+    controller.run_controller()

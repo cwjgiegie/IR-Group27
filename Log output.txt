@@ -1,0 +1,111 @@
+INFO: intelligent_robot_controller: Starting controller: python.exe -u intelligent_robot_controller.py
+>>> [A*] Goal grid occupied, path may fail.
+>>> [A*] Failed to find path.
+>>> [A*] No path found to GOAL, use direct point.
+[INFO] 动态墙初始位置: [-2.7684425583401113, -1.62313, -1.33227e-14]
+[INFO] MOVING_WALL2 found, start pos = [0.48976, 0.0893163, -0.16950867084062446]
+[INFO] MOVING_WALL3 found, start pos = [-2.1285471367999302, -2.01699, -1.77636e-15]
+[t=1] pos=(-3.18,-3.46) theta=0.97 HL_target=GOAL dist=6.12 batt=100.0 danger=0.14 Lobs=0.66 Robs=0.67 behavior=GOAL
+[t=21] pos=(-3.12,-3.38) theta=0.83 HL_target=GOAL dist=6.01 batt=99.6 danger=0.16 Lobs=0.66 Robs=0.64 behavior=GOAL
+[t=41] pos=(-3.05,-3.31) theta=0.82 HL_target=GOAL dist=5.91 batt=99.2 danger=0.20 Lobs=0.64 Robs=0.67 behavior=GOAL
+[t=61] pos=(-2.98,-3.23) theta=0.82 HL_target=GOAL dist=5.81 batt=98.8 danger=0.18 Lobs=0.65 Robs=0.69 behavior=GOAL
+[t=81] pos=(-2.91,-3.16) theta=0.82 HL_target=GOAL dist=5.71 batt=98.4 danger=0.14 Lobs=0.64 Robs=0.67 behavior=GOAL
+[t=101] pos=(-2.84,-3.08) theta=0.82 HL_target=GOAL dist=5.60 batt=98.0 danger=0.14 Lobs=0.66 Robs=0.67 behavior=GOAL
+[t=121] pos=(-2.77,-3.01) theta=0.82 HL_target=GOAL dist=5.50 batt=97.6 danger=0.15 Lobs=0.67 Robs=0.67 behavior=GOAL
+[t=141] pos=(-2.70,-2.94) theta=0.82 HL_target=GOAL dist=5.40 batt=97.2 danger=0.15 Lobs=0.69 Robs=0.69 behavior=GOAL
+[t=161] pos=(-2.63,-2.86) theta=0.82 HL_target=GOAL dist=5.30 batt=96.8 danger=0.18 Lobs=0.69 Robs=0.66 behavior=GOAL
+[t=181] pos=(-2.56,-2.79) theta=0.82 HL_target=GOAL dist=5.19 batt=96.4 danger=0.13 Lobs=0.68 Robs=0.64 behavior=GOAL
+[t=201] pos=(-2.49,-2.71) theta=0.82 HL_target=GOAL dist=5.09 batt=96.0 danger=0.15 Lobs=0.69 Robs=0.66 behavior=GOAL
+[t=221] pos=(-2.42,-2.64) theta=0.82 HL_target=GOAL dist=4.99 batt=95.6 danger=0.15 Lobs=0.66 Robs=0.70 behavior=GOAL
+[t=241] pos=(-2.35,-2.56) theta=0.82 HL_target=GOAL dist=4.89 batt=95.2 danger=0.11 Lobs=0.67 Robs=0.64 behavior=GOAL
+[t=261] pos=(-2.29,-2.51) theta=0.61 HL_target=GOAL dist=4.81 batt=94.8 danger=0.64 Lobs=0.69 Robs=0.78 behavior=AVOID
+[t=281] pos=(-2.29,-2.50) theta=0.28 HL_target=GOAL dist=4.81 batt=94.4 danger=0.58 Lobs=0.68 Robs=0.80 behavior=AVOID
+[t=301] pos=(-2.24,-2.50) theta=0.42 HL_target=GOAL dist=4.77 batt=94.0 danger=0.48 Lobs=0.66 Robs=0.75 behavior=GOAL
+[t=321] pos=(-2.20,-2.49) theta=0.47 HL_target=GOAL dist=4.73 batt=93.6 danger=0.12 Lobs=0.67 Robs=0.67 behavior=GOAL
+[t=341] pos=(-2.12,-2.42) theta=0.81 HL_target=GOAL dist=4.63 batt=93.2 danger=0.13 Lobs=0.65 Robs=0.69 behavior=GOAL
+[t=361] pos=(-2.05,-2.35) theta=0.83 HL_target=GOAL dist=4.53 batt=92.8 danger=0.16 Lobs=0.69 Robs=0.68 behavior=GOAL
+[t=381] pos=(-1.98,-2.27) theta=0.83 HL_target=GOAL dist=4.42 batt=92.4 danger=0.14 Lobs=0.66 Robs=0.66 behavior=GOAL
+[t=401] pos=(-1.91,-2.19) theta=0.83 HL_target=GOAL dist=4.32 batt=92.0 danger=0.14 Lobs=0.66 Robs=0.66 behavior=GOAL
+[t=421] pos=(-1.87,-2.16) theta=0.74 HL_target=GOAL dist=4.27 batt=91.6 danger=0.13 Lobs=0.68 Robs=0.65 behavior=GOAL
+[t=441] pos=(-1.80,-2.09) theta=0.83 HL_target=GOAL dist=4.17 batt=91.2 danger=0.22 Lobs=0.68 Robs=0.71 behavior=GOAL
+[t=461] pos=(-1.73,-2.01) theta=0.83 HL_target=GOAL dist=4.06 batt=90.8 danger=0.15 Lobs=0.64 Robs=0.68 behavior=GOAL
+[t=481] pos=(-1.66,-1.94) theta=0.83 HL_target=GOAL dist=3.96 batt=90.4 danger=0.11 Lobs=0.66 Robs=0.66 behavior=GOAL
+[t=501] pos=(-1.59,-1.86) theta=0.83 HL_target=GOAL dist=3.86 batt=90.0 danger=0.17 Lobs=0.70 Robs=0.69 behavior=GOAL
+[t=521] pos=(-1.52,-1.78) theta=0.83 HL_target=GOAL dist=3.76 batt=89.6 danger=0.14 Lobs=0.67 Robs=0.67 behavior=GOAL
+[t=541] pos=(-1.45,-1.71) theta=0.83 HL_target=GOAL dist=3.65 batt=89.2 danger=0.15 Lobs=0.69 Robs=0.65 behavior=GOAL
+[t=561] pos=(-1.44,-1.70) theta=0.01 HL_target=GOAL dist=3.63 batt=88.8 danger=0.23 Lobs=0.68 Robs=0.68 behavior=GOAL
+[t=581] pos=(-1.36,-1.66) theta=0.74 HL_target=GOAL dist=3.55 batt=88.4 danger=0.19 Lobs=0.70 Robs=0.66 behavior=GOAL
+[t=601] pos=(-1.29,-1.58) theta=0.84 HL_target=GOAL dist=3.45 batt=88.0 danger=0.13 Lobs=0.66 Robs=0.66 behavior=GOAL
+[t=621] pos=(-1.22,-1.51) theta=0.85 HL_target=GOAL dist=3.35 batt=87.6 danger=0.11 Lobs=0.66 Robs=0.66 behavior=GOAL
+[t=641] pos=(-1.15,-1.43) theta=0.85 HL_target=GOAL dist=3.25 batt=87.2 danger=0.17 Lobs=0.67 Robs=0.71 behavior=GOAL
+[t=661] pos=(-1.08,-1.35) theta=0.85 HL_target=GOAL dist=3.14 batt=86.8 danger=0.11 Lobs=0.66 Robs=0.63 behavior=GOAL
+[t=681] pos=(-1.02,-1.28) theta=0.85 HL_target=GOAL dist=3.04 batt=86.4 danger=0.17 Lobs=0.67 Robs=0.67 behavior=GOAL
+[t=701] pos=(-0.95,-1.20) theta=0.85 HL_target=GOAL dist=2.94 batt=86.0 danger=0.15 Lobs=0.69 Robs=0.68 behavior=GOAL
+[t=721] pos=(-0.88,-1.12) theta=0.85 HL_target=GOAL dist=2.84 batt=85.6 danger=0.18 Lobs=0.66 Robs=0.67 behavior=GOAL
+[t=741] pos=(-0.81,-1.05) theta=0.85 HL_target=GOAL dist=2.73 batt=85.2 danger=0.14 Lobs=0.67 Robs=0.67 behavior=GOAL
+[t=761] pos=(-0.74,-0.97) theta=0.85 HL_target=GOAL dist=2.63 batt=84.8 danger=0.10 Lobs=0.65 Robs=0.67 behavior=GOAL
+[t=781] pos=(-0.68,-0.89) theta=0.85 HL_target=GOAL dist=2.53 batt=84.4 danger=0.16 Lobs=0.67 Robs=0.69 behavior=GOAL
+[t=801] pos=(-0.61,-0.82) theta=0.85 HL_target=GOAL dist=2.43 batt=84.0 danger=0.14 Lobs=0.67 Robs=0.67 behavior=GOAL
+[t=821] pos=(-0.54,-0.74) theta=0.85 HL_target=GOAL dist=2.32 batt=83.6 danger=0.11 Lobs=0.65 Robs=0.66 behavior=GOAL
+[t=841] pos=(-0.47,-0.66) theta=0.85 HL_target=GOAL dist=2.22 batt=83.2 danger=0.14 Lobs=0.69 Robs=0.67 behavior=GOAL
+[t=861] pos=(-0.40,-0.59) theta=0.85 HL_target=GOAL dist=2.12 batt=82.8 danger=0.14 Lobs=0.64 Robs=0.66 behavior=GOAL
+[t=881] pos=(-0.38,-0.55) theta=1.31 HL_target=GOAL dist=2.08 batt=82.4 danger=0.67 Lobs=0.81 Robs=0.66 behavior=AVOID
+[t=901] pos=(-0.38,-0.55) theta=2.17 HL_target=GOAL dist=2.08 batt=82.0 danger=0.47 Lobs=0.74 Robs=0.68 behavior=AVOID
+[t=921] pos=(-0.39,-0.52) theta=1.80 HL_target=GOAL dist=2.06 batt=81.6 danger=0.58 Lobs=0.79 Robs=0.67 behavior=AVOID
+[t=941] pos=(-0.40,-0.49) theta=1.72 HL_target=GOAL dist=2.05 batt=81.2 danger=0.44 Lobs=0.74 Robs=0.69 behavior=GOAL
+[t=961] pos=(-0.41,-0.47) theta=2.04 HL_target=GOAL dist=2.04 batt=80.8 danger=0.53 Lobs=0.76 Robs=0.67 behavior=GOAL
+[t=981] pos=(-0.42,-0.44) theta=1.98 HL_target=GOAL dist=2.02 batt=80.4 danger=0.57 Lobs=0.80 Robs=0.69 behavior=AVOID
+[t=1001] pos=(-0.43,-0.41) theta=1.96 HL_target=GOAL dist=2.01 batt=80.0 danger=0.51 Lobs=0.76 Robs=0.68 behavior=AVOID
+[t=1021] pos=(-0.43,-0.38) theta=1.78 HL_target=GOAL dist=1.99 batt=79.6 danger=0.58 Lobs=0.76 Robs=0.66 behavior=AVOID
+[t=1041] pos=(-0.44,-0.35) theta=1.64 HL_target=GOAL dist=1.98 batt=79.2 danger=0.56 Lobs=0.74 Robs=0.65 behavior=AVOID
+[t=1061] pos=(-0.45,-0.34) theta=1.92 HL_target=GOAL dist=1.97 batt=78.8 danger=0.52 Lobs=0.75 Robs=0.65 behavior=AVOID
+>>> [REPLAN] Stuck detected, re-planning path.
+>>> [A*] Goal grid occupied, path may fail.
+>>> [A*] Failed to find path.
+>>> [A*] No path found to GOAL, use direct point.
+[t=1081] pos=(-0.46,-0.29) theta=1.39 HL_target=GOAL dist=1.95 batt=78.4 danger=0.21 Lobs=0.64 Robs=0.68 behavior=GOAL
+[t=1101] pos=(-0.41,-0.21) theta=0.78 HL_target=GOAL dist=1.86 batt=78.0 danger=0.13 Lobs=0.66 Robs=0.67 behavior=GOAL
+[t=1121] pos=(-0.33,-0.15) theta=0.71 HL_target=GOAL dist=1.76 batt=77.6 danger=0.12 Lobs=0.66 Robs=0.68 behavior=GOAL
+[t=1141] pos=(-0.26,-0.08) theta=0.71 HL_target=GOAL dist=1.66 batt=77.2 danger=0.15 Lobs=0.70 Robs=0.66 behavior=GOAL
+[t=1161] pos=(-0.18,-0.01) theta=0.71 HL_target=GOAL dist=1.55 batt=76.8 danger=0.15 Lobs=0.70 Robs=0.66 behavior=GOAL
+[t=1181] pos=(-0.10,0.05) theta=0.71 HL_target=GOAL dist=1.45 batt=76.4 danger=0.13 Lobs=0.65 Robs=0.67 behavior=GOAL
+[t=1201] pos=(-0.02,0.12) theta=0.71 HL_target=GOAL dist=1.35 batt=76.0 danger=0.21 Lobs=0.67 Robs=0.69 behavior=GOAL
+[t=1221] pos=(-0.01,0.13) theta=0.03 HL_target=GOAL dist=1.33 batt=75.6 danger=0.68 Lobs=0.68 Robs=0.82 behavior=AVOID
+[t=1241] pos=(0.04,0.12) theta=0.08 HL_target=GOAL dist=1.30 batt=75.2 danger=0.18 Lobs=0.72 Robs=0.64 behavior=GOAL
+[t=1261] pos=(0.08,0.13) theta=0.16 HL_target=GOAL dist=1.27 batt=74.8 danger=0.62 Lobs=0.67 Robs=0.79 behavior=AVOID
+[t=1281] pos=(0.13,0.13) theta=0.23 HL_target=GOAL dist=1.23 batt=74.4 danger=0.52 Lobs=0.70 Robs=0.78 behavior=GOAL
+[t=1301] pos=(0.15,0.13) theta=0.14 HL_target=GOAL dist=1.22 batt=74.0 danger=0.35 Lobs=0.65 Robs=0.74 behavior=GOAL
+[t=1321] pos=(0.21,0.13) theta=0.26 HL_target=GOAL dist=1.17 batt=73.6 danger=0.55 Lobs=0.65 Robs=0.83 behavior=AVOID
+[t=1341] pos=(0.24,0.12) theta=0.08 HL_target=GOAL dist=1.16 batt=73.2 danger=0.41 Lobs=0.69 Robs=0.72 behavior=GOAL
+[t=1361] pos=(0.26,0.13) theta=0.32 HL_target=GOAL dist=1.14 batt=72.8 danger=0.52 Lobs=0.68 Robs=0.75 behavior=AVOID
+[t=1381] pos=(0.31,0.13) theta=0.29 HL_target=GOAL dist=1.11 batt=72.4 danger=0.61 Lobs=0.67 Robs=0.84 behavior=AVOID
+[t=1401] pos=(0.34,0.12) theta=0.17 HL_target=GOAL dist=1.09 batt=72.0 danger=0.32 Lobs=0.65 Robs=0.72 behavior=GOAL
+>>> [REPLAN] Stuck detected, re-planning path.
+>>> [A*] Goal grid occupied, path may fail.
+>>> [A*] Failed to find path.
+>>> [A*] No path found to GOAL, use direct point.
+[t=1421] pos=(0.40,0.15) theta=0.56 HL_target=GOAL dist=1.04 batt=71.6 danger=0.13 Lobs=0.69 Robs=0.64 behavior=GOAL
+[t=1441] pos=(0.47,0.22) theta=0.95 HL_target=GOAL dist=0.94 batt=71.2 danger=0.17 Lobs=0.69 Robs=0.65 behavior=GOAL
+[t=1461] pos=(0.52,0.30) theta=0.97 HL_target=GOAL dist=0.85 batt=70.8 danger=0.10 Lobs=0.65 Robs=0.65 behavior=GOAL
+[t=1481] pos=(0.57,0.36) theta=0.97 HL_target=GOAL dist=0.77 batt=70.4 danger=0.11 Lobs=0.66 Robs=0.65 behavior=GOAL
+[t=1501] pos=(0.61,0.43) theta=0.97 HL_target=GOAL dist=0.69 batt=70.0 danger=0.13 Lobs=0.65 Robs=0.68 behavior=GOAL
+[t=1521] pos=(0.65,0.48) theta=0.97 HL_target=GOAL dist=0.63 batt=69.6 danger=0.15 Lobs=0.65 Robs=0.66 behavior=GOAL
+[t=1541] pos=(0.68,0.53) theta=0.97 HL_target=GOAL dist=0.57 batt=69.2 danger=0.11 Lobs=0.67 Robs=0.65 behavior=GOAL
+[t=1561] pos=(0.71,0.58) theta=0.97 HL_target=GOAL dist=0.51 batt=68.8 danger=0.16 Lobs=0.67 Robs=0.70 behavior=GOAL
+[t=1581] pos=(0.74,0.62) theta=0.97 HL_target=GOAL dist=0.46 batt=68.4 danger=0.19 Lobs=0.66 Robs=0.70 behavior=GOAL
+[t=1601] pos=(0.77,0.66) theta=0.97 HL_target=GOAL dist=0.42 batt=68.0 danger=0.16 Lobs=0.68 Robs=0.67 behavior=GOAL
+[t=1621] pos=(0.79,0.69) theta=0.97 HL_target=GOAL dist=0.38 batt=67.6 danger=0.16 Lobs=0.69 Robs=0.66 behavior=GOAL
+>>> [REPLAN] Stuck detected, re-planning path.
+>>> [A*] Goal grid occupied, path may fail.
+>>> [A*] Failed to find path.
+>>> [A*] No path found to GOAL, use direct point.
+[t=1641] pos=(0.81,0.72) theta=0.97 HL_target=GOAL dist=0.34 batt=67.2 danger=0.09 Lobs=0.64 Robs=0.66 behavior=GOAL
+[t=1661] pos=(0.83,0.75) theta=0.97 HL_target=GOAL dist=0.31 batt=66.8 danger=0.15 Lobs=0.65 Robs=0.70 behavior=GOAL
+[t=1681] pos=(0.84,0.77) theta=0.97 HL_target=GOAL dist=0.28 batt=66.4 danger=0.16 Lobs=0.68 Robs=0.68 behavior=GOAL
+[t=1701] pos=(0.86,0.79) theta=0.97 HL_target=GOAL dist=0.25 batt=66.0 danger=0.10 Lobs=0.66 Robs=0.66 behavior=GOAL
+[t=1721] pos=(0.87,0.81) theta=0.97 HL_target=GOAL dist=0.22 batt=65.6 danger=0.14 Lobs=0.68 Robs=0.70 behavior=GOAL
+[t=1741] pos=(0.89,0.83) theta=0.97 HL_target=GOAL dist=0.20 batt=65.2 danger=0.13 Lobs=0.68 Robs=0.67 behavior=GOAL
+[t=1761] pos=(0.90,0.85) theta=0.97 HL_target=GOAL dist=0.18 batt=64.8 danger=0.19 Lobs=0.68 Robs=0.69 behavior=GOAL
+[t=1781] pos=(0.91,0.86) theta=0.97 HL_target=GOAL dist=0.16 batt=64.4 danger=0.13 Lobs=0.66 Robs=0.68 behavior=GOAL
+>>> [TASK] Final goal reached, mission done.
+>>> [SUMMARY] dist_travelled=7.318 m, behavior_switches=72, collisions=3, stuck_replans=3, energy_used=35.98
