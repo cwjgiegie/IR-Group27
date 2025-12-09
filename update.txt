@@ -1,0 +1,60 @@
+def update_state_from_sensors(self):
+   
+    if not self.distance_sensors:
+        print("[WARN] No distance sensors configured.")
+        # 给状态一个安全的默认值
+        self.state.obstacle_danger = 0.0
+        self.state.min_obstacle_distance = 1.0
+        self.state.left_obstacle = 0.0
+        self.state.right_obstacle = 0.0
+        return
+
+    raw_values = [sensor.getValue() for sensor in self.distance_sensors]
+    max_reading = max(raw_values)
+
+    print(
+      
+        [int(v) for v in raw_values],
+     
+        int(max_reading),
+    )
+
+ 
+    BASELINE = 60.0   
+    MAX_RANGE = 80.0  
+    SIDE_NORM = 400.0 
+
+    danger_raw = (max_reading - BASELINE) / MAX_RANGE
+   
+    danger = max(0.0, min(1.0, danger_raw))
+
+    self.state.obstacle_danger = danger
+   
+    self.state.min_obstacle_distance = 1.0 - danger
+
+    
+    n = len(raw_values)
+    if n == 8:
+       
+        left_values = raw_values[0:4]
+        right_values = raw_values[4:8]
+    else:
+        
+        mid = n // 2
+        left_values = raw_values[:mid]
+        right_values = raw_values[mid:]
+
+    left_strength = min(1.0, sum(left_values) / SIDE_NORM)
+    right_strength = min(1.0, sum(right_values) / SIDE_NORM)
+
+    self.state.left_obstacle = left_strength
+    self.state.right_obstacle = right_strength
+
+    print(
+        
+        round(danger, 3),
+    
+        round(left_strength, 3),
+   
+        round(right_strength, 3),
+    )
