@@ -47,7 +47,7 @@ class BTNode:
 
 
 class Selector(BTNode):
-    """优先级选择节点：按顺序 tick 子节点，返回第一个非 None 的结果"""
+    """Priority selection node: Tick the child nodes in sequence and return the first non-None result."""
     def __init__(self, children):
         self.children = children
 
@@ -60,7 +60,7 @@ class Selector(BTNode):
 
 
 class ConditionNode(BTNode):
-    """条件节点：条件满足才执行子节点"""
+    """Conditional node: Sub-nodes are executed only when the condition is met."""
     def __init__(self, condition_fn, child):
         self.condition_fn = condition_fn
         self.child = child
@@ -72,7 +72,7 @@ class ConditionNode(BTNode):
 
 
 class ActionNode(BTNode):
-    """动作节点：直接返回一个行为名"""
+    """Action node: Directly return a behavior name"""
     def __init__(self, behavior_name):
         self.behavior_name = behavior_name
 
@@ -165,7 +165,7 @@ class IntelligentRobotController(Supervisor):
             self.wall_start_pos = self.wall_translation_field.getSFVec3f()
             print(f"[INFO] 动态墙初始位置: {self.wall_start_pos}")
         else:
-            print("[WARN] 未找到 MOVING_WALL，请检查场景树 DEF 名字")
+            print("[WARN] not found MOVING_WALL，pleace check world tree's DEF name")
             self.wall_translation_field = None
             self.wall_start_pos = None
 
