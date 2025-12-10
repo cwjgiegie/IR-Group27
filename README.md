@@ -2,16 +2,92 @@
 
 ## Group27
 
-This work addresses the problem of unstable behavior switching and efficiency degradation commonly observed in mobile robots operating in cluttered environments. To improve stability and robustness, we propose a hybrid navigation and decision-making framework that integrates fuzzy activation, hysteresis-based jitter suppression, and a Vector Field Histogram (VFH) inspired local planner within a behavior tree architecture. Fuzzy activation smooths the decision boundaries by providing continuous behavior relevance scores, while the hysteresis and cooldown mechanism effectively reduces rapid switching and mitigates oscillatory behavior. The VFH-style local planner further enhances obstacle avoidance, particularly in dense or irregular environments. We evaluate the proposed system in three representative Webots simulation scenarios and compare its performance against a baseline behavior tree controller. Experimental results show that our approach significantly increases goal-reaching success rates, reduces behavior switching frequency, and improves overall path smoothness and navigation stability. Although failures still occur in narrow U-shaped corridors due to the limitations of purely reactive local planning, the results demonstrate the effectiveness of the proposed framework in enhancing the reliability and consistency of robot navigation.
+# Intelligent Robot Controller (Webots)
 
-Project Description: 
-The "analysis" folder is used for conducting data analysis. It stores the output data generated during the code execution and uses Python to perform graphical analysis on it. 
-The "controllers" folder contains the core code that controls the movement of the robot. 
-The "Worlds" is the code for the Webot world. 
-The other txt files are all auxiliary files.
+## 1. What this project does
 
-Group manber: Username  Real name
-cwjgiegie - Wenjian Chen
-littleHandsomeboy - Wenjun He
-xc-LEUNG - Xiaocong Liang
-Duochuan9 - Hongbo Han
+We built a smarter navigation controller for a mobile robot in Webots.
+The main goals:
+
+* Make **behaviour switching more stable** (no crazy flickering between GOAL / AVOID / CHARGE)
+* Improve **obstacle avoidance** in cluttered maps
+* Handle **low battery** with a proper CHARGE behaviour
+* Collect logs so we can **analyse runs afterwards**
+
+The robot combines:
+
+* A **behaviour tree** (CHARGE > AVOID > GOAL)
+* **Fuzzy logic** to compute how “relevant” each behaviour is
+* A **cooldown + hysteresis** system to stop rapid switching
+* **A*** global planning on a 2D occupancy grid
+* A **VFH-style local planner** using left/right sensor sums
+* A simple **battery model** + charging at a station
+* **Stuck detection** and automatic re-planning
+
+---
+
+## 2. What we wrote ourselves
+
+All the main logic is implemented by us in Python, including:
+
+* Behaviour tree nodes (`Selector`, `ConditionNode`, `ActionNode`)
+* Fuzzy membership functions (low battery, obstacle danger, far from goal)
+* Behaviour selection with anti-chattering (cooldown + hysteresis margin)
+* A* path planning on a hand-crafted occupancy grid
+* Local obstacle avoidance + “reverse when stuck on wall” logic
+* Battery drain & charging behaviour
+* Dynamic obstacle motion (moving walls using sin waves)
+* Logging of:
+
+  * distance travelled
+  * number of behaviour switches
+  * “collision-like” events
+  * stuck re-plans
+  * energy used
+
+No external navigation libraries are used – planning and decisions are coded by hand.
+
+---
+
+## 3. What is pre-built / external
+
+We rely on:
+
+* **Webots API**: `Supervisor`, motors, distance sensors, node translation/rotation
+* **Standard Python libraries**:
+
+  * `math` (angles, `hypot`, etc.)
+  * `heapq` (priority queue for A*)
+  * `os` (check log file)
+* **Webots project structure**: standard `worlds/` and `controllers/` layout
+
+We don’t use ROS or any external path planning / VFH packages.
+
+---
+
+## 4. Folder structure
+
+* **`controllers/intelligent_robot_controller.py`**
+  Our main controller with all behaviour logic, A*, fuzzy activation, logging, etc.
+
+* **`analysis/`**
+
+  * Stores CSV logs (e.g. `run_log.csv`) from experiments
+  * Python scripts for plotting behaviour over time, comparing runs, etc.
+
+* **`worlds/`**
+  Webots world file(s): robot, static obstacles, moving walls, goal, charging station.
+
+* **Other `.txt` files**
+  Notes, parameters, and helper documentation.
+
+---
+
+## 5. Group members
+
+* `cwjgiegie` – **Wenjian Chen**
+* `littleHandsomeboy` – **Wenjun He**
+* `xc-LEUNG` – **Xiaocong Liang**
+* `Duochuan9` – **Hongbo Han**
+
+
