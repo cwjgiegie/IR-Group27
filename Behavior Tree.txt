@@ -1,0 +1,38 @@
+#Construct Behavior Tree: CHARGE Priority > AVOID > GOAL
+        self.behavior_tree = Selector([
+            ConditionNode(
+                lambda ctx: ctx["mu_low_batt"] > 0.6,   # Low Power Conditions
+                ActionNode("CHARGE")
+            ),
+            ConditionNode(
+                lambda ctx: ctx["mu_obs"] > 0.5,     # Hazardous Obstruction Conditions
+                ActionNode("AVOID")
+            ),
+            ActionNode("GOAL")                      # Default behavior
+        ])
+
+
+    def init_log_file(self):
+        fname = "run_log.csv"
+        new_file = not os.path.exists(fname)
+        self.log_file = open(fname, "a")
+        if new_file:
+            self.log_file.write(
+                "tick,x,y,theta,behavior,batt,dist_goal,"
+                "danger,left_obs,right_obs,dist_travelled,"
+                "switch_count,collision_count,stuck_replan_count\n"
+            )
+            self.log_file.flush()
+
+    def log_status(self):
+        if self.log_file is None:
+            return
+        s = self.state
+        self.log_file.write(
+            f"{self.tick},{s.x:.4f},{s.y:.4f},{s.theta:.4f},"
+            f"{s.active_behavior},{s.battery_level:.2f},{s.distance_to_goal:.4f},"
+            f"{s.obstacle_danger:.3f},{s.left_obstacle:.3f},{s.right_obstacle:.3f},"
+            f"{s.distance_travelled:.4f},{s.behavior_switch_count},"
+            f"{s.collision_count},{s.stuck_replan_count}\n"
+        )
+        self.log_file.flush()
