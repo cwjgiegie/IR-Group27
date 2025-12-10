@@ -43,7 +43,7 @@ plt.tight_layout()
 
 
 
-# 弹出窗口看看图
+# show
 plt.show()
 plt.close()
 
@@ -57,7 +57,7 @@ plt.grid(True)
 plt.tight_layout()
 
 
-# 弹出窗口显示
+# show
 plt.show()
 plt.close()
 #--------------------------------------------------------------------------------------------------------------------------
@@ -66,7 +66,7 @@ import re
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# ========= 通用解析函数 =========
+# ========= fun =========
 pattern = re.compile(
     r"\[t=(\d+)\]\s+pos=\(([-\d.]+),([-\d.]+)\)\s+theta=([-\d.]+)\s+"
     r"HL_target=([A-Z]+)\s+dist=([-\d.]+)\s+batt=([-\d.]+)\s+"
@@ -88,11 +88,11 @@ def load_log(path):
                 })
     return pd.DataFrame(rows)
 
-# ========= 读取两个文件 =========
+# ========= read file =========
 df_success = load_log(r"C:\Users\Kevin\Desktop\table.txt")
 df_failure = load_log(r"C:\Users\Kevin\Desktop\table2.txt")
 
-# ========= 行为编码（必须保留，否则没有 behavior_code 这一列） =========
+# ========= =========
 behavior_map = {
     "GOAL": 0,
     "AVOID": 1,
@@ -108,11 +108,11 @@ df_failure = behavior_to_int(df_failure)
 
 plt.figure(figsize=(10, 5))
 
-# 成功行为曲线
+# successful curve
 plt.step(df_success["t"], df_success["behavior_code"],
          where="post", label="Successful Run", linewidth=2)
 
-# 失败行为曲线
+# field curve
 plt.step(df_failure["t"], df_failure["behavior_code"],
          where="post", label="Failed Run", linestyle="--", linewidth=2, color="orange")
 
