@@ -1,67 +1,65 @@
 # intelligent_robot_controller.py
-# 智能机器人项目控制器骨架（版本：稳定避障 + 减抖动 + 改进脱困）
+# Intelligent Robot Project Controller Skeleton (Version: Stable Obstacle Avoidance + Debounce + Improved Unstuck Logic)
 
 from controller import Supervisor
 import math
 
-TIME_STEP = 64  # 仿真时间步长（必须与 world basicTimeStep 一致）
+TIME_STEP = 64  # Simulation time step (must match world basicTimeStep)
 
-# !!! 把这里改成你在 world 里看到的小车初始 translation 的 (x, y) !!!
+# !!! Change this to the robot’s initial translation (x, y) as seen in the world !!!
 START_X = -3.0
 START_Y = -3.0
 
-# !!! 把这里改成 goal 在 world 里的 (x, y) !!!
+# !!! Change this to the goal’s (x, y) in the world !!!
 GOAL_POSITION = (1.0, 1.0)
-
 CHARGING_STATION = (3.0, -3.0)
 
-# 认为在 15cm 以内就算到达目标
+# Consider reaching the goal when within 15 cm
 GOAL_REACHED_DIST = 0.15
 
 
 # =====================================================================
-# 一、机器人状态类（RobotState）
+# I. Robot State Class (RobotState)
 # =====================================================================
 
 class RobotState:
     def __init__(self):
-        # 电池系统
+        # Battery system
         self.battery_level = 100.0
         
-        # 障碍物相关
+        # Obstacle-related
         self.min_obstacle_distance = 1.0
         self.obstacle_danger = 0.0
 
-        # 左右障碍强度
+        # Left/right obstacle intensity
         self.left_obstacle = 0.0
         self.right_obstacle = 0.0
         
-        # 机器人位姿（这里用世界坐标，平面是 x-y，z 为高度忽略）
-        self.x = START_X     # 世界坐标 x
-        self.y = START_Y     # 世界坐标 y
-        self.theta = 0.0     # 朝向（弧度），0 约为 +x 方向
-        
+        # Robot pose (world coordinates, plane is x–y, z ignored)
+        self.x = START_X     # World coordinate x
+        self.y = START_Y     # World coordinate y
+        self.theta = 0.0     # Heading angle (radians), 0 approx. +x direction
         
         self.going_to_charging = False
         
-        # 目标相关
+        # Goal-related
         self.distance_to_goal = 0.0
-        self.heading_error = 0.0   # 机器人朝向 与 “目标方向” 的差值（-pi~pi）
+        self.heading_error = 0.0   # Robot heading minus “target direction” (-π~π)
         self.goal_visible = 1.0
         
-        # 路径偏差程度
+        # Path deviation level
         self.path_deviation = 0.0
         
-        # 卡住指标（后面如果要检测卡死可以用）
+        # Stuck indicator (for potential stuck detection)
         self.stuck_indicator = 0.0
 
 
 # =====================================================================
-# 二、行为基类（Behavior）
+# II. Behavior Base Class (Behavior)
 # =====================================================================
 
 class Behavior:
-    """所有行为的父类"""
+    """Parent class for all behaviors"""
     def __init__(self, name):
         self.name = name
     
@@ -73,7 +71,7 @@ class Behavior:
 
 
 # =====================================================================
-# 三、基础行为（避障、导航、紧急脱困）
+# III. Basic Behaviors (Obstacle Avoidance, Navigation, Emergency Unstuck)
 # =====================================================================
 
 class AvoidObstacleBehavior(Behavior):
@@ -81,32 +79,32 @@ class AvoidObstacleBehavior(Behavior):
         super().__init__("AvoidObstacle")
     
     def compute_activation(self, state: RobotState):
-        # 已经到达目标，完全关闭避障行为
+        # When goal reached, fully disable obstacle avoidance
         if state.distance_to_goal < GOAL_REACHED_DIST:
             return 0.0
-        # 危险越高越优先
+        # Higher danger → higher priority
         return state.obstacle_danger
 
     def execute(self, state: RobotState):
         d = state.obstacle_danger
 
-        # 非常近 —— 强制直线快速后退（比以前更容易触发）
+        # Very close — force fast straight backward (easier to trigger than before)
         if d > 0.7:
             return -5.0, -5.0
 
-        # 中等危险：一边后退一边转向
+        # Medium danger: move backward while turning
         left = state.left_obstacle
         right = state.right_obstacle
 
-        # 左边障碍明显多 → 向右后退
+        # More obstacles on the left → back up to the right
         if left > right + 0.05:
             return -2.0, -4.0
 
-        # 右边障碍明显多 → 向左后退
+        # More obstacles on the right → back up to the left
         if right > left + 0.05:
             return -4.0, -2.0
 
-        # 两边差不多 → 原地旋转，找个新的方向
+        # Similar on both sides → rotate in place to find a new direction
         return -2.5, 2.5
 
 
@@ -123,35 +121,35 @@ class NavigateBehavior(Behavior):
         return max(0.0, min(1.0, base))
 
     def execute(self, state: RobotState):
-        # 1) 已经在目标附近 → 停
+        # 1) If near the goal → stop
         if state.distance_to_goal < GOAL_REACHED_DIST:
             print("[NAV] Goal reached, stopping.")
             return 0.0, 0.0
 
-        # 2) 基础前进速度
+        # 2) Base forward speed
         base_speed = 4.0
 
-        # 3) 计算转向量 w，并强行“不要太大”
-        k_turn = 2.0              # 比原来 5.0 小很多，不那么暴躁
+        # 3) Compute turning term w, make it “not too large”
+        k_turn = 2.0              # Much smaller than previous 5.0, less aggressive
         w = k_turn * state.heading_error
 
-        # 关键：限制 w 的大小，确保 |w| < base_speed
-        w_max = 3.0               # 3 < base_speed=4，保证前进分量为正
+        # Limit w to ensure |w| < base_speed
+        w_max = 3.0               # 3 < base_speed=4, ensures positive forward motion
         if w > w_max:
             w = w_max
         elif w < -w_max:
             w = -w_max
 
-        # 4) 计算左右轮速度（一定都为正数）
+        # 4) Compute wheel speeds (always positive)
         left = base_speed - w
         right = base_speed + w
 
-        # 5) 限制最大轮速
+        # 5) Limit max wheel speed
         max_speed = 6.28
         left = max(-max_speed, min(max_speed, left))
         right = max(-max_speed, min(max_speed, right))
 
-        # 6) 到目标很近时整体减速
+        # 6) Slow down if close to goal
         if state.distance_to_goal < 0.3:
             left *= 0.5
             right *= 0.5
@@ -162,35 +160,35 @@ class NavigateBehavior(Behavior):
 
 class EmergencyStopBehavior(Behavior):
     """
-    改进版脱困行为：
-    - phase 1: 大力后退
-    - phase 2: 原地转向（方向伪随机）
-    - phase 3: 低速前冲
-    - phase 4: 挂起一帧，根据新危险度决定是否再次脱困或退出
+    Improved emergency unstuck behavior:
+    - phase 1: Strong backward motion
+    - phase 2: In-place turning (pseudo-random direction)
+    - phase 3: Low-speed forward push
+    - phase 4: Pause for one frame, then check danger again to decide whether to retry or exit
     """
     def __init__(self):
         super().__init__("EmergencyStop")
 
-        self.phase = 0          # 0 未启动  1 后退  2 转向  3 前冲  4 挂起
+        self.phase = 0          # 0 not started, 1 backward, 2 turn, 3 forward, 4 wait
         self.step  = 0
-        self.turn_dir = 1       # +1 左转   -1 右转
+        self.turn_dir = 1       # +1 left, -1 right
 
     def compute_activation(self, state: RobotState):
-        # 已经到达目标，就不要再紧急脱困
+        # If goal reached, do not trigger emergency unstuck
         if state.distance_to_goal < GOAL_REACHED_DIST:
             self.phase = 0
             self.step = 0
             return 0.0
 
-        # 正在执行脱困序列 → 必须保持激活
+        # If already executing unstuck sequence → stay active
         if self.phase > 0:
             return 1.0
 
-        # 危险非常大才启动紧急脱困（阈值从 0.95 降到 0.7）
+        # Trigger unstuck only under high danger (threshold lowered from 0.95 to 0.7)
         if state.obstacle_danger > 0.7:
             self.phase = 1
             self.step = 0
-            # 用位置的奇偶性做一个简单伪随机，决定左转还是右转
+            # Simple pseudo-random turn direction using parity of position
             self.turn_dir = 1 if (state.x + state.y) % 2.0 < 1.0 else -1
             print("[EST] START back-off")
             return 1.0
@@ -198,11 +196,11 @@ class EmergencyStopBehavior(Behavior):
         return 0.0
 
     def execute(self, state: RobotState):
-        # 尚未启动（一般不会发生）
+        # Phase not started
         if self.phase == 0:
             return 0.0, 0.0
 
-        # 1) 后退 60 步（先退远点）
+        # 1) Backward for 60 steps
         if self.phase == 1:
             if self.step < 60:
                 self.step += 1
@@ -212,7 +210,7 @@ class EmergencyStopBehavior(Behavior):
                 self.step = 0
                 print("[EST] START turn")
 
-        # 2) 原地转向 50 步（方向随机）
+        # 2) In-place turning for 50 steps (random direction)
         if self.phase == 2:
             if self.step < 50:
                 self.step += 1
@@ -222,29 +220,29 @@ class EmergencyStopBehavior(Behavior):
                 self.step = 0
                 print("[EST] START escape")
 
-        # 3) 低速前冲 30 步（试图离开墙面）
+        # 3) Low-speed forward push for 30 steps
         if self.phase == 3:
             if self.step < 30:
                 self.step += 1
                 return 3.0, 3.0
             else:
-                self.phase = 4          # 进入挂起，让传感器更新
+                self.phase = 4          # Pause to update sensors
                 self.step = 0
                 print("[EST] WAIT sensor")
 
-        # 4) 挂起：只有 danger 仍然爆表才再开一轮，否则退出
+        # 4) Pause: retry if danger still high, otherwise exit
         if self.phase == 4:
             if state.obstacle_danger > 0.7:
-                self.phase = 1          # 再来一轮
+                self.phase = 1          # Retry cycle
                 self.step  = 0
                 print("[EST] RETRY")
             else:
-                self.phase = 0          # 危险解除，正常退出
+                self.phase = 0          # Danger gone, exit normally
         return 0.0, 0.0
 
 
 # =====================================================================
-# 模糊决策（目前还没启用，只是占位）
+# Fuzzy decision (not used yet, placeholder only)
 # =====================================================================
 
 class FuzzyDecision:
@@ -313,7 +311,7 @@ class FuzzyDecision:
 
 
 # =====================================================================
-# 四、行为树 (Behavior Tree) —— 加入“迟滞”和“最小停留时间”
+# IV. Behavior Tree — with Hysteresis and Minimum Dwell Time
 # =====================================================================
 
 class BehaviorTree:
@@ -325,14 +323,14 @@ class BehaviorTree:
         self.last_switch_tick = 0
 
     def decide(self, state: RobotState, tick: int):
-        # 目前先不用模糊逻辑，直接用各个行为的 compute_activation，
-        # 但加入“迟滞 + 最小停留时间”防止频繁抖动。
+        # Currently not using fuzzy logic; directly use each behavior’s compute_activation,
+        # but add “hysteresis + minimum dwell time” to suppress oscillation.
         if self.fuzzy is None:
             activations = {}
             for b in self.behaviors:
                 activations[b] = b.compute_activation(state)
 
-            # 初次选择
+            # Initial selection
             if self.current_behavior is None:
                 best_behavior = max(activations, key=activations.get)
                 self.current_behavior = best_behavior
@@ -340,22 +338,22 @@ class BehaviorTree:
                 print(f"[BT] Init -> {best_behavior.name} (a={activations[best_behavior]:.2f}, tick={tick})")
                 return self.current_behavior
 
-            # 当前行为和最佳行为
+            # Current behavior and best behavior
             best_behavior = max(activations, key=activations.get)
             a_best = activations[best_behavior]
             a_curr = activations[self.current_behavior]
 
-            # ======= 抖动抑制参数 =======
-            MIN_DWELL = 15   # 一个行为至少持续 15 个 tick
-            HYST = 0.15      # 新行为激活度至少比当前高 0.15 才切换
+            # ===== Oscillation suppression parameters =====
+            MIN_DWELL = 15   # A behavior must last at least 15 ticks
+            HYST = 0.15      # New behavior must exceed current by 0.15 to switch
 
             chosen = self.current_behavior
 
-            # 如果当前行为还没“待够久”，强制继续当前行为
+            # If current behavior hasn’t lasted long enough → keep it
             if tick - self.last_switch_tick < MIN_DWELL:
                 chosen = self.current_behavior
             else:
-                # 已经待够久了，且新行为明显更“值得” → 切换
+                # Enough time has passed; switch if clearly better
                 if a_best > a_curr + HYST:
                     chosen = best_behavior
 
@@ -367,7 +365,7 @@ class BehaviorTree:
 
             return self.current_behavior
 
-        # 下面是留给模糊逻辑的分支（现在不用）
+        # Fuzzy-logic branch (currently unused)
         activations = self.fuzzy.get_activations(state)
         best_name = max(activations, key=activations.get)
         best_activation = activations[best_name]
@@ -390,17 +388,17 @@ class BehaviorTree:
 
 
 # =====================================================================
-# 五、主控制器：Webots 对接部分
+# V. Main Controller: Webots Interface
 # =====================================================================
 
 class IntelligentRobotController(Supervisor):
     def __init__(self):
         super().__init__()
         
-        # 保存机器人自身节点，用来读世界坐标
+        # Store robot node to read world coordinates
         self.robot_node = self.getSelf()
 
-        # ---------------- 电机初始化 ----------------
+        # ------------- Motor initialization -------------
         self.left_motor = self.getMotor("left wheel motor")
         self.right_motor = self.getMotor("right wheel motor")
 
@@ -410,7 +408,7 @@ class IntelligentRobotController(Supervisor):
         self.left_motor.setVelocity(0.0)
         self.right_motor.setVelocity(0.0)
         
-        # ---------------- 距离传感器 ----------------
+        # ------------- Distance sensors -------------
         self.distance_sensors = []
         sensor_names = ["ps0", "ps1", "ps2", "ps3", "ps4", "ps5", "ps6", "ps7"]
         for name in sensor_names:
@@ -419,10 +417,10 @@ class IntelligentRobotController(Supervisor):
                 sensor.enable(TIME_STEP)
                 self.distance_sensors.append(sensor)
         
-        # 机器人状态
+        # Robot state
         self.state = RobotState()
         
-        # 行为树：优先级从高到低（EmergencyStop 一旦触发，会占据控制）
+        # Behavior tree: priority high → low (EmergencyStop dominates once triggered)
         self.behaviors = [
             EmergencyStopBehavior(),
             AvoidObstacleBehavior(),
@@ -432,36 +430,37 @@ class IntelligentRobotController(Supervisor):
 
         self.bt = BehaviorTree(self.behaviors, self.fuzzy_decision)
 
-        # tick 计数
+        # Tick counter
         self.tick = 0
+
     def update_battery_and_target(self, moving: bool):
         """
-        简单电量模型：
-        - 机器人动的时候掉电快一点
-        - 不动的时候掉电慢一点
-        - 低电量时，把目标切换为充电站
-        - 到达充电站后，缓慢充电，充满再回到主目标
+        Simple battery model:
+        - Battery drains faster when moving
+        - Drains slowly when idle
+        - Low battery → switch target to charging station
+        - When near charging station, recharge slowly; when full, return to main goal
         """
-        # 1) 电量消耗
+        # 1) Battery consumption
         if moving:
-            self.state.battery_level -= 0.03    # 运动时每步掉 0.03
+            self.state.battery_level -= 0.03    # Moving drains 0.03 per step
         else:
-            self.state.battery_level -= 0.005   # 静止也有小损耗
+            self.state.battery_level -= 0.005   # Idle drains a small amount
 
-        # 限制在 [0, 100]
+        # Clamp to [0, 100]
         if self.state.battery_level < 0.0:
             self.state.battery_level = 0.0
         if self.state.battery_level > 100.0:
             self.state.battery_level = 100.0
 
-        # 2) 低电量 → 切换到去充电站
+        # 2) Low battery → go to charging station
         if (not self.state.going_to_charging) and self.state.battery_level < 30.0:
             self.state.going_to_charging = True
             print(">>> [BAT] Low battery, switch target to CHARGING STATION")
 
-        # 3) 在充电站附近时，开始充电
+        # 3) When near charging station, start charging
         if self.state.going_to_charging and self.state.distance_to_goal < GOAL_REACHED_DIST:
-            # 简单充电模型：每步加 0.5
+            # Simple recharge model: +0.5 per step
             self.state.battery_level += 0.5
             if self.state.battery_level >= 99.0:
                 self.state.battery_level = 100.0
@@ -470,17 +469,17 @@ class IntelligentRobotController(Supervisor):
     
 
     def update_odometry(self):
-        # 1. 从世界里拿真实位置
+        # 1. Read actual position from world
         trans = self.robot_node.getField("translation").getSFVec3f()
-        self.state.x = trans[0]   # 平面 x
-        self.state.y = trans[1]   # 平面 y
+        self.state.x = trans[0]   # planar x
+        self.state.y = trans[1]   # planar y
     
-        # 2. 真实朝向（假设只绕 z 轴转）
+        # 2. Real orientation (assume rotation only around z axis)
         rot = self.robot_node.getField("rotation").getSFRotation()
         axis_x, axis_y, axis_z, angle = rot
         self.state.theta = angle
     
-        # 3. 计算与“当前目标”的距离和方向
+        # 3. Compute distance and direction to “current target”
         if self.state.going_to_charging:
             goal_x, goal_y = CHARGING_STATION
             target_name = "CHARGING"
@@ -505,89 +504,92 @@ class IntelligentRobotController(Supervisor):
             f"target={target_name}, battery={self.state.battery_level:.1f}, "
             f"heading_err={heading_err:.2f}"
         )
+
         
     # =================================================================
-    # 更新状态（重要）
-    # =================================================================
-    
-    def update_state_from_sensors(self):
-        if not self.distance_sensors:
-            print("No distance sensors found!")
-            return
+# Update state (IMPORTANT)
+# =================================================================
 
-        values = [s.getValue() for s in self.distance_sensors]
-        max_val = max(values)
+def update_state_from_sensors(self):
+    if not self.distance_sensors:
+        print("No distance sensors found!")
+        return
 
-        print("Sensor values:", [int(v) for v in values], " max:", int(max_val))
+    values = [s.getValue() for s in self.distance_sensors]
+    max_val = max(values)
 
-        baseline = 60.0
-        max_range = 80.0
+    print("Sensor values:", [int(v) for v in values], " max:", int(max_val))
 
-        danger_raw = (max_val - baseline) / max_range
-        danger = max(0.0, min(1.0, danger_raw))
+    # Rough sensor baseline and normalization
+    baseline = 60.0
+    max_range = 80.0
 
-        self.state.obstacle_danger = danger
-        self.state.min_obstacle_distance = 1.0 - danger
+    danger_raw = (max_val - baseline) / max_range
+    danger = max(0.0, min(1.0, danger_raw))
 
-        # 左右障碍强度估计
-        if len(values) == 8:
-            left_sum = values[0] + values[1] + values[2] + values[3]
-            right_sum = values[4] + values[5] + values[6] + values[7]
+    self.state.obstacle_danger = danger
+    self.state.min_obstacle_distance = 1.0 - danger
+
+    # Estimate left/right obstacle intensity
+    if len(values) == 8:
+        left_sum = values[0] + values[1] + values[2] + values[3]
+        right_sum = values[4] + values[5] + values[6] + values[7]
+    else:
+        mid = len(values) // 2
+        left_sum = sum(values[:mid])
+        right_sum = sum(values[mid:])
+
+    norm_factor = 400.0
+    self.state.left_obstacle = min(1.0, left_sum / norm_factor)
+    self.state.right_obstacle = min(1.0, right_sum / norm_factor)
+
+    print(
+        "Obstacle danger:", round(danger, 3),
+        " | left:", round(self.state.left_obstacle, 3),
+        " right:", round(self.state.right_obstacle, 3)
+    )
+
+# =================================================================
+# Main program loop
+# =================================================================
+def run_controller(self):
+    # Previous control command (used to detect whether robot is moving)
+    last_left = 0.0
+    last_right = 0.0
+
+    while self.step(TIME_STEP) != -1:
+        self.tick += 1
+
+        # 0. Odometry: update pose & relation to target
+        self.update_odometry()
+
+        # 1. Sensor update
+        self.update_state_from_sensors()
+        
+        # 2. Behavior tree decision
+        behavior = self.bt.decide(self.state, self.tick)
+        
+        # 3. Execute behavior
+        if behavior is None:
+            left_speed, right_speed = 0.0, 0.0
         else:
-            mid = len(values) // 2
-            left_sum = sum(values[:mid])
-            right_sum = sum(values[mid:])
+            left_speed, right_speed = behavior.execute(self.state)
+        
+        # 4. Battery + task switching (based on whether robot is moving)
+        moving = (abs(left_speed) > 0.1 or abs(right_speed) > 0.1)
+        self.update_battery_and_target(moving)
 
-        norm_factor = 400.0
-        self.state.left_obstacle = min(1.0, left_sum / norm_factor)
-        self.state.right_obstacle = min(1.0, right_sum / norm_factor)
+        # 5. Set wheel speeds
+        self.left_motor.setVelocity(left_speed)
+        self.right_motor.setVelocity(right_speed)
 
-        print(
-            "Obstacle danger:", round(danger, 3),
-            " | left:", round(self.state.left_obstacle, 3),
-            " right:", round(self.state.right_obstacle, 3)
-        )
+        # Optional log (for future “stuck detection”)
+        last_left = left_speed
+        last_right = right_speed
 
-    # =================================================================
-    # 主程序循环
-    # =================================================================
-    def run_controller(self):
-        # 上一次的控制命令，用于判断“是不是在动”
-        last_left = 0.0
-        last_right = 0.0
-
-        while self.step(TIME_STEP) != -1:
-            self.tick += 1
-
-            # 0. 里程计：更新位姿 & 与目标的关系
-            self.update_odometry()
-
-            # 1. 传感器更新
-            self.update_state_from_sensors()
-            
-            # 2. 行为树决策
-            behavior = self.bt.decide(self.state, self.tick)
-            
-            # 3. 执行行为
-            if behavior is None:
-                left_speed, right_speed = 0.0, 0.0
-            else:
-                left_speed, right_speed = behavior.execute(self.state)
-            
-            # 4. 电量 + 任务切换（基于当前是否在动）
-            moving = (abs(left_speed) > 0.1 or abs(right_speed) > 0.1)
-            self.update_battery_and_target(moving)
-
-            # 5. 设置轮速
-            self.left_motor.setVelocity(left_speed)
-            self.right_motor.setVelocity(right_speed)
-
-            # 记录一下（目前没用，可以以后做“卡住检测”）
-            last_left = left_speed
-            last_right = right_speed
 
 # =====================================================================
-# 六、入口
+# Six.Entrance
 # =====================================================================
 
 if __name__ == "__main__":
@@ -596,15 +598,16 @@ if __name__ == "__main__":
 -----------------------------------------------------------1111111111111111111111------------------------------------------------------------
 
 # intelligent_robot_controller.py
-# 精简稳定版：直观导航 + 简单避障 + 电量管理 + 自动去充电站
-# 去掉行为树 / 模糊系统，方便你调试和看懂
+# Simplified stable version:
+# Straightforward navigation + simple obstacle avoidance + battery management + auto charging
+# Behavior tree / fuzzy system removed for easier debugging and understanding
 
 from controller import Supervisor
 import math
 
-TIME_STEP = 64  # 要和 world 里的 basicTimeStep 一致
+TIME_STEP = 64  # Must match basicTimeStep in the world file
 
-# ======= 根据你给的截图设置 =======
+# ======= Setup based on your screenshot =======
 # Robot:  position -3 -3 0.00017
 # Goal:   position  1  1 2.69
 # Charge: position  3 -3 0.3
@@ -614,7 +617,7 @@ START_Y = -3.0
 GOAL_POSITION = (1.0, 1.0)
 CHARGING_STATION = (3.0, -3.0)
 
-GOAL_REACHED_DIST = 0.15   # 认为到目标 15cm 内就算到达
+GOAL_REACHED_DIST = 0.15   # Goal considered reached within 15 cm
 
 
 class RobotState:
@@ -642,7 +645,7 @@ class IntelligentRobotController(Supervisor):
 
         self.robot_node = self.getSelf()
 
-        # 电机
+        # Motors
         self.left_motor = self.getDevice("left wheel motor")
         self.right_motor = self.getDevice("right wheel motor")
 
@@ -652,7 +655,7 @@ class IntelligentRobotController(Supervisor):
         self.left_motor.setVelocity(0.0)
         self.right_motor.setVelocity(0.0)
 
-        # 距离传感器
+        # Distance sensors
         sensor_names = ["ps0", "ps1", "ps2", "ps3", "ps4", "ps5", "ps6", "ps7"]
         self.distance_sensors = []
         for name in sensor_names:
@@ -664,20 +667,20 @@ class IntelligentRobotController(Supervisor):
         self.state = RobotState()
         self.tick = 0
 
-    # ========== 姿态更新 ==========
+    # ========== Pose update ==========
     def update_pose(self):
         trans = self.robot_node.getField("translation").getSFVec3f()
         rot = self.robot_node.getField("rotation").getSFRotation()
 
-        # 在你这个 world 里平面是 x-y，z 基本是高度
+        # In this world, the ground plane is x-y, and z is height
         self.state.x = trans[0]
         self.state.y = trans[1]
 
         axis_x, axis_y, axis_z, angle = rot
-        # 轴基本是 (0,0,1)，直接把 angle 当朝向
+        # The rotation axis is basically (0,0,1); angle is the heading
         self.state.theta = angle
 
-        # 选择当前的目标点
+        # Select the current target point
         if self.state.going_to_charging:
             gx, gy = CHARGING_STATION
             target_name = "CHARGE"
@@ -695,7 +698,7 @@ class IntelligentRobotController(Supervisor):
         heading_err = (heading_err + math.pi) % (2.0 * math.pi) - math.pi
         self.state.heading_error = heading_err
 
-        # 最终目标达成
+        # Final goal achieved
         if (not self.state.going_to_charging) and dist < GOAL_REACHED_DIST:
             if not self.state.mission_done:
                 print(">>> [TASK] Final goal reached, mission done.")
@@ -703,7 +706,7 @@ class IntelligentRobotController(Supervisor):
 
         return target_name
 
-    # ========== 传感器 ==========
+    # ========== Sensors ==========
     def update_sensors(self):
         if not self.distance_sensors:
             return
@@ -711,14 +714,14 @@ class IntelligentRobotController(Supervisor):
         values = [s.getValue() for s in self.distance_sensors]
         max_val = max(values)
 
-        # 这里的数值大概在 60~80 左右，越大越近
+        # Sensor values are around 60–80; larger means closer
         baseline = 60.0
         max_range = 80.0
         danger_raw = (max_val - baseline) / max_range
         danger = max(0.0, min(1.0, danger_raw))
         self.state.obstacle_danger = danger
 
-        # 左/右 4 个传感器求和
+        # Sum the left/right 4 sensors
         if len(values) == 8:
             left_sum = sum(values[0:4])
             right_sum = sum(values[4:8])
@@ -731,12 +734,12 @@ class IntelligentRobotController(Supervisor):
         self.state.left_obstacle = min(1.0, left_sum / norm)
         self.state.right_obstacle = min(1.0, right_sum / norm)
 
-    # ========== 电量 & 目标切换 ==========
+    # ========== Battery & target switching ==========
     def update_battery_and_target(self, moving: bool):
         if self.state.mission_done:
             return
 
-        # 非常简单的电量模型
+        # Very simple battery model
         if moving:
             self.state.battery_level -= 0.03
         else:
@@ -747,12 +750,12 @@ class IntelligentRobotController(Supervisor):
         if self.state.battery_level > 100.0:
             self.state.battery_level = 100.0
 
-        # 低电 -> 切换去充电站
+        # Low battery → switch to charging station
         if (not self.state.going_to_charging) and self.state.battery_level < 30.0:
             self.state.going_to_charging = True
             print(">>> [BAT] Low battery, go to CHARGING_STATION")
 
-        # 在充电站附近就缓慢充电
+        # Near charging station → slow charging
         if self.state.going_to_charging and self.state.distance_to_goal < GOAL_REACHED_DIST:
             self.state.battery_level += 0.5
             if self.state.battery_level >= 100.0:
@@ -760,7 +763,7 @@ class IntelligentRobotController(Supervisor):
                 self.state.going_to_charging = False
                 print(">>> [BAT] Fully charged, switch back to GOAL")
 
-    # ========== 计算速度命令 ==========
+    # ========== Compute velocity command ==========
     def compute_command(self):
         if self.state.mission_done or self.state.battery_level <= 0.0:
             return 0.0, 0.0
@@ -771,40 +774,38 @@ class IntelligentRobotController(Supervisor):
         left_o = self.state.left_obstacle
         right_o = self.state.right_obstacle
 
-        # 基本思路：
-        # 1. 危险非常大：先强制后退 + 朝远离障碍的方向转
-        # 2. 危险中等：减速 + 侧向绕开障碍
-        # 3. 危险很小：按照朝向误差往目标开
+        # Basic idea:
+        # 1. Very high danger: force reverse + turn away from obstacle
+        # 2. Medium danger: slow down + side-steer around obstacle
+        # 3. Low danger: navigate toward target based on heading error
 
         max_speed = 6.28
 
-        # 1) 高危险：强制后退
+        # 1) High danger → emergency backward
         if danger > 0.7:
             turn_bias = 2.0 if left_o > right_o else -2.0
             v = -3.0
             w = turn_bias
-        # 2) 中等危险：稍微减速并根据左右障碍差偏转
+        # 2) Medium danger → slow down & steer based on sensor difference
         elif danger > 0.3:
             v = 2.0
-            w = 3.0 * (right_o - left_o)    # 左边更近则 w>0 → 往右转
+            w = 3.0 * (right_o - left_o)    # If left side is closer → turn right
         else:
-            # 3) 正常导航：P 控制
-            # 距离越远，线速度越大，最多 4.0
+            # 3) Normal navigation: P-control
             v = 4.0 * min(d, 1.0)
-            # 朝向误差越大，转得越狠
             w = 3.0 * e
 
-        # 把 (v, w) 转成左右轮速度
+        # Convert (v, w) to wheel speeds
         v_left = v - w
         v_right = v + w
 
-        # 限制在电机允许的范围内
+        # Limit motor speed range
         v_left = max(-max_speed, min(max_speed, v_left))
         v_right = max(-max_speed, min(max_speed, v_right))
 
         return v_left, v_right
 
-    # ========== 主循环 ==========
+    # ========== Main loop ==========
     def run_controller(self):
         last_log_tick = -999
 
@@ -833,7 +834,7 @@ class IntelligentRobotController(Supervisor):
             self.left_motor.setVelocity(v_left)
             self.right_motor.setVelocity(v_right)
 
-            # 每 20 个 tick 打一行日志，避免刷屏
+            # Log every 20 ticks to avoid spamming
             if self.tick - last_log_tick >= 20:
                 last_log_tick = self.tick
                 print(
@@ -851,28 +852,29 @@ class IntelligentRobotController(Supervisor):
 if __name__ == "__main__":
     controller = IntelligentRobotController()
     controller.run_controller()
------------------------22222222222222222222模糊行为选择 + 抖动抑制骨架code--------------------------------------
+
+-----------------------22222222222222222222 Fuzzy Behavior Selection + Jitter Suppression Framework code--------------------------------------
 
 # intelligent_robot_controller.py
-# 升级版：在原基础上加入
-# 1) 模糊行为激活 (GOAL / AVOID / CHARGE)
-# 2) 行为选择 + 抖动抑制 (hysteresis + cooldown)
-# 3) 充电站停车逻辑
+# Upgraded version: adds
+# 1) Fuzzy behavior activation (GOAL / AVOID / CHARGE)
+# 2) Behavior selection + jitter suppression (hysteresis + cooldown)
+# 3) Charging-station parking logic
 
 from controller import Supervisor
 import math
 
-TIME_STEP = 64  # 要和 world 里的 basicTimeStep 一致
+TIME_STEP = 64  # Must match basicTimeStep in the world
 
-# ======= 场景设置 =======
+# ======= Scene Settings =======
 START_X = -3.0
 START_Y = -3.0
 
 GOAL_POSITION = (1.0, 1.0)
 CHARGING_STATION = (3.0, -3.0)
 
-GOAL_REACHED_DIST = 0.15   # 认为到目标 15cm 内就算到达
-CHARGING_REACHED_DIST = 0.15  # 充电站范围
+GOAL_REACHED_DIST = 0.15        # Consider goal reached if within 15 cm
+CHARGING_REACHED_DIST = 0.15    # Charging-station radius
 
 
 class RobotState:
@@ -881,20 +883,20 @@ class RobotState:
         self.y = START_Y
         self.theta = 0.0
 
-        # 电量
+        # Battery
         self.battery_level = 100.0
 
-        # 目标与导航相关
+        # Goal & navigation
         self.going_to_charging = False
         self.distance_to_goal = 0.0
         self.heading_error = 0.0
 
-        # 障碍相关
+        # Obstacle-related
         self.obstacle_danger = 0.0
         self.left_obstacle = 0.0
         self.right_obstacle = 0.0
 
-        # 行为选择相关
+        # Behavior-selection
         self.active_behavior = "GOAL"   # "GOAL" / "AVOID" / "CHARGE"
         self.last_behavior = "GOAL"
         self.last_switch_tick = 0
@@ -908,7 +910,7 @@ class IntelligentRobotController(Supervisor):
 
         self.robot_node = self.getSelf()
 
-        # 电机
+        # Motors
         self.left_motor = self.getDevice("left wheel motor")
         self.right_motor = self.getDevice("right wheel motor")
 
@@ -917,7 +919,7 @@ class IntelligentRobotController(Supervisor):
         self.left_motor.setVelocity(0.0)
         self.right_motor.setVelocity(0.0)
 
-        # 距离传感器
+        # Distance sensors
         sensor_names = ["ps0", "ps1", "ps2", "ps3", "ps4", "ps5", "ps6", "ps7"]
         self.distance_sensors = []
         for name in sensor_names:
@@ -929,24 +931,24 @@ class IntelligentRobotController(Supervisor):
         self.state = RobotState()
         self.tick = 0
 
-        # 行为选择参数
-        self.behavior_cooldown = 20    # 至少 20 tick 内不切换行为
-        self.hysteresis_margin = 0.1   # 当前行为激活度只要不比最大低超过 0.1，就保持
+        # Behavior selection parameters
+        self.behavior_cooldown = 20     # Cannot switch behavior for at least 20 ticks
+        self.hysteresis_margin = 0.1    # Maintain behavior if activation is within 0.1 of max
 
-    # ========== 姿态更新 ==========
+    # ========== Pose Update ==========
     def update_pose(self):
         trans = self.robot_node.getField("translation").getSFVec3f()
         rot = self.robot_node.getField("rotation").getSFRotation()
 
-        # 在你这个 world 里平面是 x-y，z 基本是高度
+        # In this world, the ground plane is x–y, z is height
         self.state.x = trans[0]
         self.state.y = trans[1]
 
         axis_x, axis_y, axis_z, angle = rot
-        # 假设旋转轴基本是 z 轴，angle 为朝向
+        # Assume axis is mainly z-axis, angle is heading
         self.state.theta = angle
 
-        # 根据当前行为决定目标点 (GOAL or CHARGE)
+        # Choose navigation target (GOAL or CHARGE)
         if self.state.active_behavior == "CHARGE":
             gx, gy = CHARGING_STATION
             target_name = "CHARGE"
@@ -964,7 +966,7 @@ class IntelligentRobotController(Supervisor):
         heading_err = (heading_err + math.pi) % (2.0 * math.pi) - math.pi
         self.state.heading_error = heading_err
 
-        # 最终目标达成（只在目标行为是 GOAL 时判定）
+        # Final goal reached (only if behavior is GOAL)
         if (self.state.active_behavior != "CHARGE") and dist < GOAL_REACHED_DIST:
             if not self.state.mission_done:
                 print(">>> [TASK] Final goal reached, mission done.")
@@ -972,7 +974,7 @@ class IntelligentRobotController(Supervisor):
 
         return target_name
 
-    # ========== 传感器 ==========
+    # ========== Sensors ==========
     def update_sensors(self):
         if not self.distance_sensors:
             return
@@ -980,14 +982,15 @@ class IntelligentRobotController(Supervisor):
         values = [s.getValue() for s in self.distance_sensors]
         max_val = max(values)
 
-        # 数值大概在 60~80 左右，越大越近（你可以之后根据实际打印调整 baseline/max_range）
+        # Typical values ~60–80: larger = closer
+        # You may adjust baseline/max_range later
         baseline = 60.0
         max_range = 80.0
         danger_raw = (max_val - baseline) / max_range
         danger = max(0.0, min(1.0, danger_raw))
         self.state.obstacle_danger = danger
 
-        # 左/右 4 个传感器求和（假设 ps0-3 左，4-7 右）
+        # Sum left/right 4 sensors (ps0-3 left, ps4-7 right)
         if len(values) == 8:
             left_sum = sum(values[0:4])
             right_sum = sum(values[4:8])
@@ -1000,12 +1003,12 @@ class IntelligentRobotController(Supervisor):
         self.state.left_obstacle = min(1.0, left_sum / norm)
         self.state.right_obstacle = min(1.0, right_sum / norm)
 
-    # ========== 电量更新（不再直接切换目标，只负责数值变化） ==========
+    # ========== Battery Update (no direct behavior switching here) ==========
     def update_battery(self, moving: bool):
         if self.state.mission_done:
             return
 
-        # 简单电量模型
+        # Simple battery model
         if moving:
             self.state.battery_level -= 0.03
         else:
@@ -1016,44 +1019,41 @@ class IntelligentRobotController(Supervisor):
         if self.state.battery_level > 100.0:
             self.state.battery_level = 100.0
 
-        # 如果在充电站范围内，并且行为是 CHARGE，则充电 + 停车
+        # If in charging zone and behavior is CHARGE → charge & stop
         if self.state.active_behavior == "CHARGE":
             dist_to_charge = math.hypot(
                 self.state.x - CHARGING_STATION[0],
                 self.state.y - CHARGING_STATION[1]
             )
             if dist_to_charge < CHARGING_REACHED_DIST:
-                # 停车充电：充电由 run_loop 里给速度 0 来保证
+                # Charging is achieved by send speed = 0 in run_loop
                 self.state.battery_level += 0.5
                 if self.state.battery_level >= 100.0:
                     self.state.battery_level = 100.0
-                    # 电量满了，下次行为选择时有机会切回 GOAL
-                    # 这里不强制马上切换，由模糊行为选择控制
+                    # When full, the next behavior-selection cycle may return to GOAL
                     print(">>> [BAT] Fully charged at station.")
 
-    # ========== 模糊 membership 函数 ==========
+    # ========== Fuzzy Membership Functions ==========
     def fuzzy_low_battery(self, batt: float) -> float:
         """
-        电量模糊集合：low
-        >= 60 -> 0, <= 20 -> 1 之间线性
+        Battery fuzzy set: low
+        >= 60 → 0, <= 20 → 1, linear in between
         """
         if batt >= 60.0:
             return 0.0
         if batt <= 20.0:
             return 1.0
-        # 20~60 线性插值
         return (60.0 - batt) / 40.0
 
     def fuzzy_obstacle_near(self, danger: float) -> float:
         """
-        障碍接近程度：直接用 danger 略微强化
+        Obstacle proximity: directly uses danger (clamped)
         """
         return max(0.0, min(1.0, danger))
 
     def fuzzy_far_from_goal(self, dist: float) -> float:
         """
-        距离目标越远，激活越高，上限 1.0
-        假设 0~1m 归一
+        Far-from-goal: larger distance → larger activation (0~1 m normalized)
         """
         if dist <= 0.1:
             return 0.0
@@ -1061,7 +1061,7 @@ class IntelligentRobotController(Supervisor):
             return 1.0
         return (dist - 0.1) / 0.9
 
-    # ========== 行为选择（类似简化行为树 + 模糊激活 + 抖动抑制） ==========
+    # ========== Behavior Selection (fuzzy + hysteresis + cooldown) ==========
     def select_behavior(self):
         batt = self.state.battery_level
         danger = self.state.obstacle_danger
@@ -1071,9 +1071,9 @@ class IntelligentRobotController(Supervisor):
         mu_obs = self.fuzzy_obstacle_near(danger)
         mu_far = self.fuzzy_far_from_goal(dist)
 
-        # 基本激活度设计（你后面可以改成更复杂的模糊规则）
-        act_charge = mu_low_batt               # 电量越低，越想 CHARGE
-        act_avoid = mu_obs                     # 障碍越近，越想 AVOID
+        # Basic activation design (you may upgrade later)
+        act_charge = mu_low_batt               # Lower battery → stronger CHARGE
+        act_avoid = mu_obs                     # Closer obstacle → stronger AVOID
         act_goal = (1.0 - mu_low_batt) * max(0.0, 1.0 - mu_obs) * mu_far
 
         activations = {
@@ -1082,33 +1082,33 @@ class IntelligentRobotController(Supervisor):
             "GOAL": act_goal
         }
 
-        # 找出激活度最大的行为
+        # Find behavior with maximum activation
         best_behavior = max(activations, key=activations.get)
         best_act = activations[best_behavior]
 
         current = self.state.active_behavior
         current_act = activations[current]
 
-        # 抖动抑制 1：冷却时间，在冷却期内尽量不切行为
+        # Jitter suppression 1: Cooldown period
         if (self.tick - self.state.last_switch_tick) < self.behavior_cooldown:
-            # 冷却期内，只在“当前行为激活度远小于最大”时才允许切换
+            # Only switch if new behavior clearly stronger
             if best_act > current_act + self.hysteresis_margin:
                 self.state.last_behavior = current
                 self.state.active_behavior = best_behavior
                 self.state.last_switch_tick = self.tick
         else:
-            # 冷却期外：如果当前行为激活度只比最大低一点，就保持
+            # Outside cooldown: only switch if significantly stronger
             if current_act + self.hysteresis_margin < best_act:
                 self.state.last_behavior = current
                 self.state.active_behavior = best_behavior
                 self.state.last_switch_tick = self.tick
 
-        # active_behavior 决定是否“逻辑上前往充电站”
+        # active_behavior decides whether we are heading to charging station
         self.state.going_to_charging = (self.state.active_behavior == "CHARGE")
 
         return activations
 
-    # ========== 计算速度命令 ==========
+    # ========== Compute Wheel Commands ==========
     def compute_command(self):
         if self.state.mission_done or self.state.battery_level <= 0.0:
             return 0.0, 0.0
@@ -1123,7 +1123,7 @@ class IntelligentRobotController(Supervisor):
 
         behavior = self.state.active_behavior
 
-        # 如果在充电行为且已经到达充电站范围内，则完全停车充电
+        # If in CHARGE mode and inside charging radius → stop completely
         if behavior == "CHARGE":
             dist_to_charge = math.hypot(
                 self.state.x - CHARGING_STATION[0],
@@ -1132,26 +1132,28 @@ class IntelligentRobotController(Supervisor):
             if dist_to_charge < CHARGING_REACHED_DIST:
                 return 0.0, 0.0
 
-        # 根据行为决定控制策略
+        # Behavior-specific control
         if behavior == "AVOID":
-            # 避障行为：比原来更激进一点
+            # Slightly more aggressive obstacle avoidance
             if danger > 0.6:
-                # 高危：后退并强烈转向
+                # High danger: reverse + strong turn
                 turn_bias = 3.0 if left_o > right_o else -3.0
                 v = -2.5
                 w = turn_bias
             else:
-                # 中危：慢速前进 + 侧向绕障
+                # Medium danger: slow forward + side steering
                 v = 1.5
                 w = 4.0 * (right_o - left_o)
+
         elif behavior == "CHARGE":
-            # 去充电站：类似 GOAL 导航，但线速度稍微保守点
+            # Move to charging station (like GOAL but more conservative)
             v = 3.0 * min(d, 1.0)
             w = 3.0 * e
+
         else:  # "GOAL"
-            # 正常导航行为
+            # Normal navigation
             if danger > 0.5:
-                # 即便在 GOAL 行为下，遇到比较大的危险也稍微让一下
+                # Even in GOAL mode, avoid moderately if danger present
                 v = 2.0
                 w = 3.0 * (right_o - left_o)
             else:
@@ -1166,7 +1168,7 @@ class IntelligentRobotController(Supervisor):
 
         return v_left, v_right
 
-    # ========== 主循环 ==========
+    # ========== Main Loop ==========
     def run_controller(self):
         last_log_tick = -999
 
@@ -1184,26 +1186,26 @@ class IntelligentRobotController(Supervisor):
                 self.right_motor.setVelocity(0.0)
                 continue
 
-            # 更新姿态、传感器
+            # Pose & sensor update
             target_name = self.update_pose()
             self.update_sensors()
 
-            # 行为选择（模糊 + 抖动抑制）
+            # Behavior selection (fuzzy + jitter suppression)
             acts = self.select_behavior()
 
-            # 根据行为计算左右轮速度
+            # Compute wheel speeds
             v_left, v_right = self.compute_command()
 
             moving = (abs(v_left) > 0.05 or abs(v_right) > 0.05)
 
-            # 更新电量（含充电逻辑）
+            # Update battery (includes charging logic)
             self.update_battery(moving)
 
-            # 发送控制
+            # Send commands
             self.left_motor.setVelocity(v_left)
             self.right_motor.setVelocity(v_right)
 
-            # 日志（减少刷屏）
+            # Log (reduced frequency)
             if self.tick - last_log_tick >= 10:
                 last_log_tick = self.tick
                 print(
@@ -1223,9 +1225,10 @@ class IntelligentRobotController(Supervisor):
 if __name__ == "__main__":
     controller = IntelligentRobotController()
     controller.run_controller()
--------------------------------------------------------33333333333格栅代码-------------------
+
+-------------------------------------------------------3333333333 Grid Code-------------------
 # intelligent_robot_controller.py
-# 版本：模糊行为选择 + 抖动抑制 + A* + 改进避障 & 低电优先充电
+# Version: Fuzzy behavior selection + Jitter suppression + A* + Improved obstacle avoidance & Low-battery priority charging
 
 from controller import Supervisor
 import math
@@ -1268,7 +1271,8 @@ class RobotState:
         self.left_obstacle = 0.0
         self.right_obstacle = 0.0
 
-        self.active_behavior = "GOAL"   # "GOAL" / "AVOID" / "CHARGE"
+        # Behavior modes: "GOAL" / "AVOID" / "CHARGE"
+        self.active_behavior = "GOAL"
         self.last_behavior = "GOAL"
         self.last_switch_tick = 0
 
@@ -1276,7 +1280,7 @@ class RobotState:
         self.path_index = 0
         self.current_high_level_target = "GOAL"
 
-        # 卡死检测（可扩展用）
+        # Stuck detection (expandable use)
         self.last_target_dist = None
         self.no_progress_ticks = 0
 
@@ -1292,11 +1296,13 @@ class IntelligentRobotController(Supervisor):
         self.left_motor = self.getDevice("left wheel motor")
         self.right_motor = self.getDevice("right wheel motor")
 
+        # Continuous rotation wheels
         self.left_motor.setPosition(float('inf'))
         self.right_motor.setPosition(float('inf'))
         self.left_motor.setVelocity(0.0)
         self.right_motor.setVelocity(0.0)
 
+        # Distance sensors
         sensor_names = ["ps0", "ps1", "ps2", "ps3", "ps4", "ps5", "ps6", "ps7"]
         self.distance_sensors = []
         for name in sensor_names:
@@ -1308,13 +1314,17 @@ class IntelligentRobotController(Supervisor):
         self.state = RobotState()
         self.tick = 0
 
+        # Jitter suppression parameters
         self.behavior_cooldown = 20
         self.hysteresis_margin = 0.1
 
+        # Static occupancy grid built from scene obstacles
         self.occupancy = self.build_static_occupancy()
+
+        # Initial path planning towards goal
         self.plan_path_to_high_level_target("GOAL")
 
-    # ===== 栅格转换 =====
+    # ===== Grid conversion =====
     def world_to_grid(self, x: float, y: float):
         gx = int(round((x - MAP_MIN_X) / GRID_RES))
         gy = int(round((y - MAP_MIN_Y) / GRID_RES))
@@ -1330,115 +1340,111 @@ class IntelligentRobotController(Supervisor):
     def build_static_occupancy(self):
         occ = [[0 for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
     
-        # 统一的安全余量（可以根据效果调大/调小）
-        # margin = 0.05  # 上面是计算用的，这里直接写死数值了
-    
-        # 每一条注释对应你发的一行：  x y z // size // rotation
-    
-        # 1) -0.494828 1.10576 0 // 0.2 1 2.4 // 0 0 1 -2.879...
-        #   → 大概在上方的一块竖着的墙
+        # Unified safety margin already applied in bounding box calculations
+        # Each comment corresponds to one obstacle from your scene: x y z // size // rotation
+
+        # 1) Roughly a vertical wall in upper area
         self.mark_obstacle_rect(
             occ,
-            -0.644828, -0.344828,   # xmin, xmax
-            0.55576, 1.65576        # ymin, ymax
+            -0.644828, -0.344828,
+            0.55576, 1.65576
         )
-    
-        # 2) 0.972293 -0.282034 0 // 0.2 1 2.4 // 0 0 1 -2.356...
+
+        # 2) Wall-like block
         self.mark_obstacle_rect(
             occ,
             0.822293, 1.122293,
             -0.832034, 0.267966
         )
-    
-        # 3) -0.111627 0.292814 0 // 0.2 1 2.4 // 0 0 1 -1.5707...
+
+        # 3) Vertical narrow wall
         self.mark_obstacle_rect(
             occ,
             -0.261627, 0.038373,
             -0.257186, 0.842814
         )
-    
-        # 4) -0.509825 1.16688 0 // 0.2 1 2.4 // 0 0 1 -2.0943...
+
+        # 4) Another upright wall
         self.mark_obstacle_rect(
             occ,
             -0.659825, -0.359825,
             0.61688, 1.71688
         )
-    
-        # 5) -2.7444 -2.33934 -5.3e-15 // 0.2 1 2.4 // 0 0 -1 1.309
+
+        # 5) Bottom-left obstacle
         self.mark_obstacle_rect(
             occ,
             -2.8944, -2.5944,
             -2.88934, -1.78934
         )
-    
-        # 6) 0.909048 1.38008 -0.207658 // 0.2 1 2.4 // ... 1.54404
+
+        # 6) Upper right block
         self.mark_obstacle_rect(
             occ,
             0.759048, 1.059048,
             0.83008, 1.93008
         )
-    
-        # 7) 0.266012 -1.25274 -0.207658 // 0.2 1 2.4 // ... -2.84768
+
+        # 7) Left-mid obstacle
         self.mark_obstacle_rect(
             occ,
             0.116012, 0.416012,
             -1.80274, -0.70274
         )
-    
-        # 8) 1.93989 -2.64774 -0.207658 // 0.2 1 2.4 // ... -2.84768
+
+        # 8) Right-lower obstacle
         self.mark_obstacle_rect(
             occ,
             1.78989, 2.08989,
             -3.19774, -2.09774
         )
-    
-        # 9) -1.78915 -1.09284 0.02 // 0.2 1 2.4 // 0 0 -1 1.309
+
+        # 9) Medium-left block
         self.mark_obstacle_rect(
             occ,
             -1.93915, -1.63915,
             -1.64284, -0.54284
         )
-    
-        # 10) -0.861625 -2.03397 -0.08 // 0.2 1 2.4 // 0 0 1 -2.356...
+
+        # 10) Lower-left vertical wall
         self.mark_obstacle_rect(
             occ,
             -1.011625, -0.711625,
             -2.58397, -1.48397
         )
-    
-        # 11) -3.21813 0.234459 -0.16 // 0.2 1 2.4 // 0 0 1 -1.0471...
+
+        # 11) Far left vertical long wall
         self.mark_obstacle_rect(
             occ,
             -3.36813, -3.06813,
             -0.315541, 0.784459
         )
-        # --- New obstacle A ---
-        # -0.124335 -0.855721 -0.1305 // 0.2 1 2.4 // rotation...
+
+        # ---- New obstacle A ----
         self.mark_obstacle_rect(
             occ,
-            -0.274335, 0.025665,     # xmin, xmax
-            -1.405721, -0.305721     # ymin, ymax
+            -0.274335, 0.025665,
+            -1.405721, -0.305721
         )
-    
-        # --- New obstacle B ---
-        # -1.87502 -2.30412 -0.1305 // 0.2 1 2.4 // rotation...
+
+        # ---- New obstacle B ----
         self.mark_obstacle_rect(
             occ,
-            -2.02502, -1.72502,      # xmin, xmax
-            -2.85412, -1.75412       # ymin, ymax
+            -2.02502, -1.72502,
+            -2.85412, -1.75412
         )
-        
     
         return occ
 
     def mark_obstacle_rect(self, occ, xmin, xmax, ymin, ymax):
+        # Mark all grid cells covered by the rectangle as occupied
         gx_min, gy_min = self.world_to_grid(xmin, ymin)
         gx_max, gy_max = self.world_to_grid(xmax, ymax)
         for gy in range(min(gy_min, gy_max), max(gy_min, gy_max) + 1):
             for gx in range(min(gx_min, gx_max), max(gx_min, gx_max) + 1):
                 occ[gy][gx] = 1
 
-    # ===== A* =====
+    # ===== A* pathfinding =====
     def astar(self, start_xy, goal_xy):
         sx, sy = start_xy
         gx, gy = goal_xy
@@ -1455,6 +1461,7 @@ class IntelligentRobotController(Supervisor):
         g_score = {(start_gx, start_gy): 0.0}
 
         def heuristic(ax, ay, bx, by):
+            # Manhattan heuristic
             return abs(ax - bx) + abs(ay - by)
 
         closed = set()
@@ -1467,6 +1474,7 @@ class IntelligentRobotController(Supervisor):
                 continue
             closed.add((cx, cy))
 
+            # Goal reached
             if cx == goal_gx and cy == goal_gy:
                 path = []
                 cur = (cx, cy)
@@ -1478,6 +1486,7 @@ class IntelligentRobotController(Supervisor):
                 wp = [self.grid_to_world(px, py) for (px, py) in path]
                 return wp
 
+            # Neighbor exploration (8-connected)
             for dx in [-1, 0, 1]:
                 for dy in [-1, 0, 1]:
                     if dx == 0 and dy == 0:
@@ -1500,6 +1509,7 @@ class IntelligentRobotController(Supervisor):
         return []
 
     def plan_path_to_high_level_target(self, target_type: str):
+        # Select target point: either charging station or goal
         if target_type == "CHARGE":
             target_xy = CHARGING_STATION
         else:
@@ -1522,6 +1532,7 @@ class IntelligentRobotController(Supervisor):
         self.state.no_progress_ticks = 0
 
     def get_current_path_target_point(self):
+        # Safety fallback if path fails
         if self.state.current_high_level_target == "CHARGE":
             fallback = CHARGING_STATION
         else:
@@ -1533,7 +1544,7 @@ class IntelligentRobotController(Supervisor):
             return fallback
         return self.state.path[self.state.path_index]
 
-    # ===== 姿态更新 =====
+    # ===== Pose update =====
     def update_pose(self):
         trans = self.robot_node.getField("translation").getSFVec3f()
         rot = self.robot_node.getField("rotation").getSFRotation()
@@ -1544,6 +1555,7 @@ class IntelligentRobotController(Supervisor):
         axis_x, axis_y, axis_z, angle = rot
         self.state.theta = angle
 
+        # Compute distance and heading error to current waypoint
         tx, ty = self.get_current_path_target_point()
         dx = tx - self.state.x
         dy = ty - self.state.y
@@ -1555,24 +1567,26 @@ class IntelligentRobotController(Supervisor):
         heading_err = (heading_err + math.pi) % (2.0 * math.pi) - math.pi
         self.state.heading_error = heading_err
 
+        # Check if final goal reached
         gx, gy = GOAL_POSITION
         dist_final_goal = math.hypot(self.state.x - gx, self.state.y - gy)
         if self.state.current_high_level_target != "CHARGE" and dist_final_goal < GOAL_REACHED_DIST:
             if not self.state.mission_done:
-                print(">>> [TASK] Final goal reached, mission done.")
+                print(">>> [TASK] Final goal reached, mission complete.")
             self.state.mission_done = True
 
-        # 路径点更新
+        # Waypoint progression
         if dist < WAYPOINT_REACHED_DIST and self.state.path:
             if self.state.path_index < len(self.state.path) - 1:
                 self.state.path_index += 1
 
-        # 记录到高层目标的距离，用于卡死检测（可扩展用）
+        # Distance to high-level target (used for potential stuck detection)
         if self.state.current_high_level_target == "CHARGE":
             tx2, ty2 = CHARGING_STATION
         else:
             tx2, ty2 = GOAL_POSITION
         dist_to_high_target = math.hypot(self.state.x - tx2, self.state.y - ty2)
+
         if self.state.last_target_dist is None:
             self.state.last_target_dist = dist_to_high_target
         else:
@@ -1584,7 +1598,7 @@ class IntelligentRobotController(Supervisor):
 
         return self.state.current_high_level_target
 
-    # ===== 传感器 =====
+    # ===== Sensor update =====
     def update_sensors(self):
         if not self.distance_sensors:
             return
@@ -1592,12 +1606,14 @@ class IntelligentRobotController(Supervisor):
         values = [s.getValue() for s in self.distance_sensors]
         max_val = max(values)
 
+        # Normalize danger intensity
         baseline = 60.0
         max_range = 80.0
         danger_raw = (max_val - baseline) / max_range
         danger = max(0.0, min(1.0, danger_raw))
         self.state.obstacle_danger = danger
 
+        # Sum left and right sensor groups
         if len(values) == 8:
             left_sum = sum(values[0:4])
             right_sum = sum(values[4:8])
@@ -1610,11 +1626,12 @@ class IntelligentRobotController(Supervisor):
         self.state.left_obstacle = min(1.0, left_sum / norm)
         self.state.right_obstacle = min(1.0, right_sum / norm)
 
-    # ===== 电量 =====
+    # ===== Battery update =====
     def update_battery(self, moving: bool):
         if self.state.mission_done:
             return
 
+        # Consumption rate
         if moving:
             self.state.battery_level -= 0.02
         else:
@@ -1625,6 +1642,7 @@ class IntelligentRobotController(Supervisor):
         if self.state.battery_level > 100.0:
             self.state.battery_level = 100.0
 
+        # Charging logic
         if self.state.active_behavior == "CHARGE":
             dist_to_charge = math.hypot(
                 self.state.x - CHARGING_STATION[0],
@@ -1636,7 +1654,7 @@ class IntelligentRobotController(Supervisor):
                     self.state.battery_level = 100.0
                     print(">>> [BAT] Fully charged at station.")
 
-    # ===== 模糊 membership =====
+    # ===== Fuzzy membership functions =====
     def fuzzy_low_battery(self, batt: float) -> float:
         if batt >= 60.0:
             return 0.0
@@ -1654,7 +1672,7 @@ class IntelligentRobotController(Supervisor):
             return 1.0
         return (dist - 0.1) / 0.9
 
-    # ===== 行为选择（改：低电优先 CHARGE） =====
+    # ===== Behavior selection (low battery prioritizes CHARGE) =====
     def select_behavior(self):
         batt = self.state.battery_level
         danger = self.state.obstacle_danger
@@ -1674,7 +1692,7 @@ class IntelligentRobotController(Supervisor):
             "GOAL": act_goal
         }
 
-        # 低电优先级：当电量 < 25% 或 低电模糊度 > 0.8 时，强制 CHARGE
+        # Low-battery priority: force charging when below 25% or fuzzy low-battery > 0.8
         if batt < 25.0 or mu_low_batt > 0.8:
             if self.state.current_high_level_target != "CHARGE":
                 self.plan_path_to_high_level_target("CHARGE")
@@ -1688,6 +1706,7 @@ class IntelligentRobotController(Supervisor):
         current_act = activations[current]
         switched = False
 
+        # Cooldown-based hysteresis
         if (self.tick - self.state.last_switch_tick) < self.behavior_cooldown:
             if best_act > current_act + self.hysteresis_margin:
                 self.state.last_behavior = current
@@ -1709,7 +1728,7 @@ class IntelligentRobotController(Supervisor):
 
         return activations
 
-    # ===== 控制命令（改：高危险双侧障碍时直线后退） =====
+    # ===== Control command (improved: when both sides very close, reverse straight out) =====
     def compute_command(self):
         if self.state.mission_done or self.state.battery_level <= 0.0:
             return 0.0, 0.0
@@ -1723,6 +1742,7 @@ class IntelligentRobotController(Supervisor):
         max_speed = 6.28
         behavior = self.state.active_behavior
 
+        # Charging station stopping
         if behavior == "CHARGE":
             dist_to_charge = math.hypot(
                 self.state.x - CHARGING_STATION[0],
@@ -1731,7 +1751,7 @@ class IntelligentRobotController(Supervisor):
             if dist_to_charge < CHARGING_REACHED_DIST:
                 return 0.0, 0.0
 
-        # 高危险 + 左右都很近：判定为“贴墙/夹缝”，先直线后退
+        # High danger + both sides extremely close → considered trapped → reverse straight
         if danger > 0.9 and left_o > 0.9 and right_o > 0.9:
             v = -2.0
             w = 0.0
@@ -1739,7 +1759,7 @@ class IntelligentRobotController(Supervisor):
             if behavior == "AVOID":
                 if danger > 0.6:
                     turn_bias = 3.0 if left_o > right_o else -3.0
-                    v = -2.0   # 稍微小一点，避免过分 spin
+                    v = -2.0   # slightly smaller to avoid excessive spinning
                     w = turn_bias
                 else:
                     v = 1.5
@@ -1755,15 +1775,17 @@ class IntelligentRobotController(Supervisor):
                     v = 4.0 * min(d, 1.0)
                     w = 3.0 * e
 
+        # Differential drive conversion
         v_left = v - w
         v_right = v + w
 
+        # Bound wheel speeds
         v_left = max(-max_speed, min(max_speed, v_left))
         v_right = max(-max_speed, min(max_speed, v_right))
 
         return v_left, v_right
 
-    # ===== 主循环 =====
+    # ===== Main loop =====
     def run_controller(self):
         last_log_tick = -999
 
@@ -1794,6 +1816,7 @@ class IntelligentRobotController(Supervisor):
             self.left_motor.setVelocity(v_left)
             self.right_motor.setVelocity(v_right)
 
+            # Periodic logging
             if self.tick - last_log_tick >= 20:
                 last_log_tick = self.tick
                 print(
@@ -1815,4 +1838,6 @@ class IntelligentRobotController(Supervisor):
 if __name__ == "__main__":
     controller = IntelligentRobotController()
     controller.run_controller()
+
+
 
