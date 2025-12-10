@@ -1,56 +1,56 @@
     def update_pose(self):
-       
+        state = self.state
+
         trans = self.robot_node.getField("translation").getSFVec3f()
         rot = self.robot_node.getField("rotation").getSFRotation()
 
-        self.state.x = trans[0]
-        self.state.y = trans[2]
-
-        self.state.theta = rot[3]
+        state.x = trans[0]
+        state.y = trans[2]
+        state.theta = rot[3]
 
         tx, ty = self.get_current_path_target_point()
-        dx = tx - self.state.x
-        dy = ty - self.state.y
+        dx = tx - state.x
+        dy = ty - state.y
 
         dist = math.hypot(dx, dy)
-        self.state.distance_to_goal = dist
+        state.distance_to_goal = dist
 
         target_theta = math.atan2(dy, dx)
-        heading_err = target_theta - self.state.theta
-        heading_err = (heading_err + math.pi) % (2.0 * math.pi) - math.pi
-        self.state.heading_error = heading_err
+        heading_err = target_theta - state.theta
+        state.heading_error = (heading_err + math.pi) % (2.0 * math.pi) - math.pi
 
         gx, gy = GOAL_POSITION
-        dist_final_goal = math.hypot(self.state.x - gx, self.state.y - gy)
+        dist_final_goal = math.hypot(state.x - gx, state.y - gy)
         if (
-            self.state.current_high_level_target != "CHARGE"
+            state.current_high_level_target != "CHARGE"
             and dist_final_goal < GOAL_REACHED_DIST
         ):
-            if not self.state.mission_done:
+            if not state.mission_done:
                 print(">>> [TASK] Final goal reached, mission done.")
-            self.state.mission_done = True
+            state.mission_done = True
 
-        if self.state.path and dist < WAYPOINT_REACHED_DIST:
-            if self.state.path_index < len(self.state.path) - 1:
-                self.state.path_index += 1
+        if (
+            state.path
+            and dist < WAYPOINT_REACHED_DIST
+            and state.path_index < len(state.path) - 1
+        ):
+            state.path_index += 1
 
-        if self.state.current_high_level_target == "CHARGE":
+        if state.current_high_level_target == "CHARGE":
             target_x, target_y = CHARGING_STATION
         else:
             target_x, target_y = GOAL_POSITION
 
-        dist_to_high_target = math.hypot(
-            self.state.x - target_x, self.state.y - target_y
-        )
+        dist_to_high_target = math.hypot(state.x - target_x, state.y - target_y)
 
-        last = self.state.last_target_dist
+        last = state.last_target_dist
         if last is None:
-            self.state.last_target_dist = dist_to_high_target
+            state.last_target_dist = dist_to_high_target
         else:
             if abs(dist_to_high_target - last) < 0.005:
-                self.state.no_progress_ticks += 1
+                state.no_progress_ticks += 1
             else:
-                self.state.no_progress_ticks = 0
-            self.state.last_target_dist = dist_to_high_target
+                state.no_progress_ticks = 0
+            state.last_target_dist = dist_to_high_target
 
-        return self.state.current_high_level_target
+        return state.current_high_level_target
