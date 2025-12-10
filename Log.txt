@@ -4,7 +4,7 @@
         while self.step(TIME_STEP) != -1:
             self.tick += 1
 
-            # 更新动态障碍物
+            # Update dynamic obstacles
             self.update_dynamic_wall()
 
             if self.state.battery_level <= 0.0:
@@ -58,4 +58,5 @@
 
 if __name__ == "__main__":
     controller = IntelligentRobotController()
+
     controller.run_controller()
