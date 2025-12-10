@@ -1815,3 +1815,4 @@ class IntelligentRobotController(Supervisor):
 if __name__ == "__main__":
     controller = IntelligentRobotController()
     controller.run_controller()
+
