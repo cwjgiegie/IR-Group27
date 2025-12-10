@@ -1,6 +1,6 @@
  # Dynamic Obstacle Movement
     def update_dynamic_wall(self):
-        self.sim_time += TIME_STEP / 1000.0  # 仿真时间（秒）
+        self.sim_time += TIME_STEP / 1000.0 # Simulation Time (seconds)
         t = self.sim_time
 
 # First Wall: Move Left and Right Along the X-Axis
@@ -22,4 +22,5 @@
             x0, y0, z0 = self.wall3_start_pos
             offset3 = WALL3_AMPLITUDE * math.sin(WALL3_SPEED * t + math.pi)
             new_x3 = x0 + offset3
+
             self.wall3_translation_field.setSFVec3f([new_x3, y0, z0])
