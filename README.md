@@ -83,11 +83,30 @@ We don’t use ROS or any external path planning / VFH packages.
 
 ---
 
-## 5. Group members
+## 5. Group members and Contributions
 
-* `cwjgiegie` – **Wenjian Chen**
-* `littleHandsomeboy` – **Wenjun He**
-* `xc-LEUNG` – **Xiaocong Liang**
-* `Duochuan9` – **Hongbo Han**
+All four team members were involved in debugging, experiments, and writing the report.  
+Below is a short summary of each person’s main focus in the code.
 
+* `littleHandsomeboy`- **Wenjun He** – Battery & behaviour switching  
+  - Implemented the battery model and charging logic in `RobotState` and `update_battery()`.  
+  - Added the `fuzzy_low_battery()` function and the CHARGE priority rule in `select_behavior()`.  
+  - Helped implement the CHARGE behaviour in `compute_command()` and tuned low-battery thresholds.
+
+* `xc-LEUNG`- **Xiaocong Liang** – Sensors & local obstacle avoidance  
+  - Set up the 8 IR distance sensors and wrote `update_sensors()` (obstacle danger, left/right obstacle).  
+  - Implemented `fuzzy_obstacle_near()` and the AVOID behaviour rules in `compute_command()`.  
+  - Tuned thresholds and gains so the robot can pass moving walls with fewer collisions.
+
+* `Duochuan9`- **Hongbo Han** – Behaviour tree & stability / logging  
+  - Implemented the behaviour tree framework (`BTNode`, `Selector`, `ConditionNode`, `ActionNode`).  
+  - Added cooldown, hysteresis, and switch counting in `select_behavior()` to reduce jitter.  
+  - Implemented stuck detection, logging (`init_log_file()`, `log_status()`), and final summary output.
+
+* `cwjgiegie` - **Wenjian Chen** – Mapping & A* global planning  
+  - Implemented the occupancy grid map (`build_static_occupancy()`, `mark_obstacle_rect()`) and  
+    coordinate conversion (`world_to_grid()`, `grid_to_world()`).  
+  - Wrote the A* planner `astar()` and integrated waypoints via  
+    `plan_path_to_high_level_target()` and `get_current_path_target_point()`.  
+  - Connected path following to `update_pose()` (distance, heading error, waypoint update, `mission_done`).
 
